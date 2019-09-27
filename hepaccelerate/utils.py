@@ -336,6 +336,7 @@ class BaseDataset(object):
 
     def preload(self, nthreads=1, verbose=False):
         t0 = time.time()
+        nevents = 0
         for ifn, fn in enumerate(self.filenames):
             #Empty ROOT file
             if os.stat(fn).st_size == 0:
@@ -344,6 +345,7 @@ class BaseDataset(object):
                 continue
             fi = uproot.open(fn)
             tt = fi.get(self.treename)
+            nevents += len(tt)
             if nthreads > 1:
                 from concurrent.futures import ThreadPoolExecutor
                 with ThreadPoolExecutor(max_workers=nthreads) as executor:
@@ -354,7 +356,7 @@ class BaseDataset(object):
         t1 = time.time()
         dt = t1 - t0
         if verbose:
-            print("Loaded {0:.2E} events in {1:.1f} seconds, {2:.2E} Hz".format(len(self), dt, len(self)/dt))
+            print("preload: {0:.2E} events in {1:.1f} seconds, {2:.2E} Hz".format(nevents, dt, nevents/dt))
 
     def num_events_raw(self):
         nev = 0
@@ -672,7 +674,7 @@ class Dataset(BaseDataset):
                 del m
         
         cache_metadata = self.cache_metadata[ifn] 
-        with open(os.path.join(dn, bfn + ".cache.json".format(attr)), "w") as fi:
+        with open(os.path.join(dn, bfn + ".cache.json"), "w") as fi:
             fi.write(json.dumps(cache_metadata, indent=2))
 
         return

@@ -108,7 +108,7 @@ class TestKernels(unittest.TestCase):
         datastructures["GenPart"] = [
             ("GenPart_pt", "float32"),
         ]
-        dataset = Dataset("nanoaod", ["data/nanoaod_test.root"], datastructures, cache_location="./mycache/", treename="Events", datapath="")
+        dataset = Dataset("nanoaod", 5*["data/nanoaod_test.root"], datastructures, cache_location="./mycache/", treename="Events", datapath="")
       
         try:
             dataset.from_cache()
