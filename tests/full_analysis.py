@@ -660,6 +660,7 @@ def parse_args():
 
 def load_and_analyze(args_tuple):
     fn, args, njec, dataset, ismc, ichunk, dnnmodel = args_tuple
+    NUMPY_LIB, ha = hepaccelerate.choose_backend(args.cuda)
     print("Loading {0}".format(fn))
     ds = load_dataset(args.datapath, args.cachepath, fn, ismc, args.nthreads, args.nocache, args.skim)
     ret = run_analysis(ds, dnnmodel, "{0}_{1}".format(dataset, ichunk), njec, args.cuda)

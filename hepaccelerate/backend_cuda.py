@@ -474,6 +474,36 @@ def histogram_from_vector(data, weights, bins, mask=None):
 
     return cupy.asnumpy(out_w), cupy.asnumpy(out_w2), cupy.asnumpy(bins)
 
+def histogram_from_vector_several(variables, weights, mask):
+    all_arrays = []
+    all_bins = []
+    num_histograms = len(variables)
+
+    for array, bins in variables:
+        all_arrays += [array]
+        all_bins += [bins]
+
+    max_bins = max([b.shape[0] for b in all_bins])
+    stacked_array = cupy.stack(all_arrays, axis=0)
+    stacked_bins = cupy.concatenate(all_bins)
+    nbins = cupy.array([len(b) for b in all_bins])
+    nbins_sum = cupy.cumsum(nbins)
+    nbins_sum = cupy.hstack([cupy.array([0]), nbins_sum])
+
+    nblocks = 32
+ 
+    out_w = cupy.zeros((len(variables), nblocks, max_bins), dtype=np.float32)
+    out_w2 = cupy.zeros((len(variables), nblocks, max_bins), dtype=np.float32)
+    fill_histogram_several[nblocks,256](
+        stacked_array, weights, mask, stacked_bins,
+        nbins, nbins_sum, out_w, out_w2
+    )
+    out_w = out_w.sum(axis=1)
+    out_w2 = out_w2.sum(axis=1)
+    out_w_separated = [cupy.asnumpy(out_w[i, 0:nbins[i]-1]) for i in range(num_histograms)]
+    out_w2_separated = [cupy.asnumpy(out_w2[i, 0:nbins[i]-1]) for i in range(num_histograms)]
+    return out_w_separated, out_w2_separated, all_bins
+
 @cuda.jit
 def get_bin_contents_cudakernel(values, edges, contents, out):
     xi = cuda.grid(1)
