@@ -207,5 +207,3 @@ class TestDataset(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-    #th = TestHistogram()
-    #th.test_histogram_several()

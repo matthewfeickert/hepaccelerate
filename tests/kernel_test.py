@@ -11,6 +11,8 @@ import hepaccelerate
 from hepaccelerate.utils import Results, Dataset, Histogram, choose_backend
 import uproot
 
+USE_CUDA = int(os.environ.get("HEPACCELERATE_CUDA", 0)) == 1
+    
 def download_file(filename, url):
     """
     Download an URL to a file
@@ -42,11 +44,11 @@ def download_if_not_exists(filename, url):
     return False
 
 class TestKernels(unittest.TestCase):
+    NUMPY_LIB, ha = choose_backend(use_cuda=USE_CUDA)
+    use_cuda = USE_CUDA
+    
     def setUp(self):
         self.dataset = dataset
-        self.NUMPY_LIB = NUMPY_LIB
-        self.ha = ha
-        self.use_cuda = use_cuda
 
     @staticmethod
     def load_dataset(numpy_lib):
@@ -303,10 +305,7 @@ class TestKernels(unittest.TestCase):
         ret["histogram_from_vector"] = t/1000/1000
         
         return ret 
-    
-use_cuda = int(os.environ.get("HEPACCELERATE_CUDA", 0)) == 1
-NUMPY_LIB, ha = choose_backend(use_cuda=use_cuda)
-dataset = TestKernels.load_dataset(NUMPY_LIB)
 
+dataset = TestKernels.load_dataset(TestKernels.NUMPY_LIB)
 if __name__ == "__main__":
     unittest.main()
