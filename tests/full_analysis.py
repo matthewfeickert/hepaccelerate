@@ -6,15 +6,28 @@ import time
 from collections import OrderedDict
 import argparse
 import multiprocessing
+import pickle
 
 import hepaccelerate
-from hepaccelerate.utils import Histogram
+from hepaccelerate.utils import Histogram, Results
 
 import math
 import numba
 from numba import cuda
 
-save_arrays = True
+save_arrays = False
+
+class DNNModel:
+    def __init__(self):
+        self.models = [
+            keras.models.load_model("model_kf{0}.h5".format(i)) for i in [0, 1, 2, 3, 4]
+        ]
+
+    def eval(self, X, use_cuda):
+        if use_cuda:
+            X = NUMPY_LIB.asnumpy(X)
+        rets = [NUMPY_LIB.array(m.predict(X, batch_size=1000000)[:, 0]) for m in self.models]
+        return rets
 
 def create_datastructure(ismc):
     datastructures = {
@@ -72,7 +85,7 @@ def create_datastructure(ismc):
     return datastructures
 
 def get_selected_muons(muons, pt_cut_leading, pt_cut_subleading, aeta_cut, iso_cut):
-    passes_iso = muons.pfRelIso03_all < iso_cut
+    passes_iso = muons.pfRelIso03_all > iso_cut
     passes_id = muons.tightId == True
     passes_subleading_pt = muons.pt > pt_cut_subleading
     passes_leading_pt = muons.pt > pt_cut_leading
@@ -94,7 +107,7 @@ def get_selected_muons(muons, pt_cut_leading, pt_cut_subleading, aeta_cut, iso_c
     return selected_muons, selected_events
 
 def get_selected_electrons(electrons, pt_cut_leading, pt_cut_subleading, aeta_cut, iso_cut):
-    passes_iso = electrons.pfRelIso03_all < iso_cut
+    passes_iso = electrons.pfRelIso03_all > iso_cut
     passes_id = electrons.pfId == True
     passes_subleading_pt = electrons.pt > pt_cut_subleading
     passes_leading_pt = electrons.pt > pt_cut_leading
@@ -138,6 +151,7 @@ def select_jets(jets, mu, el, selected_muons, selected_electrons, pt_cut, aeta_c
     passes_id = jets.puId == True
     passes_aeta = NUMPY_LIB.abs(jets.eta) < aeta_cut
     passes_pt = jets.pt > pt_cut
+    passes_btag = jets.btag > btag_cut
     
     selected_jets = passes_id & passes_aeta & passes_pt
 
@@ -150,8 +164,9 @@ def select_jets(jets, mu, el, selected_muons, selected_electrons, pt_cut, aeta_c
         selected_electrons, jet_lepton_dr_cut)
     
     selected_jets_no_lepton = selected_jets & jets_pass_dr_mu & jets_pass_dr_el
+    selected_jets_btag = selected_jets_no_lepton & passes_btag
     
-    return selected_jets_no_lepton
+    return selected_jets_no_lepton, selected_jets_btag
 
 def fill_histograms_several(hists, systematic_name, histname_prefix, variables, mask, weights, use_cuda):
     all_arrays = []
@@ -222,7 +237,7 @@ def update_histograms_systematic(hists, hist_name, systematic_name, target_histo
         target_histogram = {syst_string: target_histogram["nominal"]}
         hists[hist_name].update(target_histogram)
 
-def run_analysis(dataset, out, njec, use_cuda):
+def run_analysis(dataset, dnnmodel, out, njec, use_cuda):
     hists = {}
     histo_bins = {
         "nmu": np.array([0,1,2,3], dtype=np.float32),
@@ -234,6 +249,13 @@ def run_analysis(dataset, out, njec, use_cuda):
         "mu_charge": np.array([-1, 0, 1], dtype=np.float32),
         "met_pt": np.linspace(0,200,100),
         "jet_pt": np.linspace(0,200,100),
+        "jet_eta": np.linspace(-5,5,100),
+        "jet_phi": np.linspace(-5,5,100),
+        "jet_btag": np.linspace(0,1,100),
+        "dnnpred_m": np.linspace(0,1,100),
+        "dnnpred_s": np.linspace(0,0.2,100),
+        "inv_mass": np.linspace(150,200, 100),
+        "sumpt": np.linspace(0,1000,100),
     }
 
     t0 = time.time()
@@ -251,9 +273,11 @@ def run_analysis(dataset, out, njec, use_cuda):
     
     evs_all = NUMPY_LIB.ones(dataset.numevents(), dtype=NUMPY_LIB.bool)
 
-    sel_mu, sel_ev_mu = get_selected_muons(mu, 30, 20, 2.4, 0.3)
+    print("Lepton selection")
+    sel_mu, sel_ev_mu = get_selected_muons(mu, 40, 20, 2.4, 0.1)
+    sel_ev_mu = sel_ev_mu & (evvars['HLT_IsoMu24'] == True)
     mu.masks["selected"] = sel_mu
-    sel_el, sel_ev_el = get_selected_electrons(el, 30, 20, 2.4, 0.3)
+    sel_el, sel_ev_el = get_selected_electrons(el, 40, 20, 2.4, 0.1)
     el.masks["selected"] = sel_el
     
     nmu = ha.sum_in_offsets(
@@ -279,7 +303,8 @@ def run_analysis(dataset, out, njec, use_cuda):
         weights_jet[k] = NUMPY_LIB.zeros_like(jets.pt)
         ha.broadcast(weights["nominal"], jets.offsets, weights_jet[k])
 
-    all_jecs = [electron_weights for i in range(njec)]
+    all_jecs = [(njec, "up", electron_weights) for i in range(njec)]
+    all_jecs += [(njec, "down", electron_weights) for i in range(njec)]
     
     jets_pt_orig = NUMPY_LIB.copy(jets.pt)
 
@@ -294,7 +319,6 @@ def run_analysis(dataset, out, njec, use_cuda):
         use_cuda,
     )
 
-    print(jets.pt.shape)
     fill_histograms_several(
         hists, "nominal", "hist__all__",
         [
@@ -305,19 +329,24 @@ def run_analysis(dataset, out, njec, use_cuda):
         use_cuda,
     )
 
+    print("Jet selection")
     #loop over the jet corrections
-    for ijec in range(len(all_jecs)):
-        #jet_pt_corr = apply_jec(jets, all_jecs[ijec])
+    for ijec, sdir, jec in all_jecs:
+        print("JEC {0} {1}".format(ijec, sdir))
+        #jet_pt_corr = apply_jec(jets, jec)
 
         #compute the corrected jet pt        
         #jets.pt = jets_pt_orig * jet_pt_corr
 
         #get selected jets
-        sel_jet = select_jets(jets, mu, el, sel_mu, sel_el, 20, 4.0, 0.3, 0.5)
+        sel_jet, sel_bjet = select_jets(jets, mu, el, sel_mu, sel_el, 40, 2.0, 0.3, 0.4)
         
         #compute the number of jets per event 
         njet = ha.sum_in_offsets(
             jets, sel_jet, evs_all, jets.masks["all"], dtype=NUMPY_LIB.int32
+        )
+        nbjet = ha.sum_in_offsets(
+            jets, sel_bjet, evs_all, jets.masks["all"], dtype=NUMPY_LIB.int32
         )
 
         inv_mass_3j = NUMPY_LIB.zeros(jets.numevents(), dtype=NUMPY_LIB.float32)
@@ -336,11 +365,12 @@ def run_analysis(dataset, out, njec, use_cuda):
         else:
             kernels.max_val_comb(jets.btag, jets.offsets, best_comb_3j, best_btag)
 
-
         #get the events with at least two jets
-        sel_ev_jet = (njet >= 2)
+        sel_ev_jet = (njet >= 4)
+        sel_ev_bjet = (nbjet >= 1)
         
-        selected_events = sel_ev_mu & sel_ev_el & sel_ev_jet
+        selected_events = sel_ev_mu & sel_ev_el & sel_ev_jet & sel_ev_bjet
+        print("Selected {0} events".format(selected_events.sum()))
 
         #get contiguous vectors of the first two jet data
         jet1 = jets.select_nth(0, object_mask=sel_jet)
@@ -372,43 +402,64 @@ def run_analysis(dataset, out, njec, use_cuda):
             jet2["pt"], jet2["eta"], jet2["phi"], jet2["btag"],
             inv_mass_3j, best_btag, sumpt_jets
         ]).T
-        
+       
+        print("evaluating DNN model") 
+        #pred = dnnmodel.eval(arr, use_cuda)
+        #pred = NUMPY_LIB.vstack(pred).T
+        #pred_m = NUMPY_LIB.mean(pred, axis=1)
+        #pred_s = NUMPY_LIB.std(pred, axis=1)
+
         fill_histograms_several(
-            hists, "jec{0}".format(ijec), "hist__nmu1_njet2__",
+            hists, ("jec{0}".format(ijec), sdir), "hist__nmu1_njet4_nbjet1__",
             [
-                (arr[:, 0], "nmu", histo_bins["nmu"]),
-                (arr[:, 1], "nel", histo_bins["nmu"]),
-                (arr[:, 2], "njet", histo_bins["njet"]),
+                #(pred_m, "pred_m", histo_bins["dnnpred_m"]),
+                #(pred_s, "pred_s", histo_bins["dnnpred_s"]),
+                (nmu, "nmu", histo_bins["nmu"]),
+                (nel, "nel", histo_bins["nmu"]),
+                (njet, "njet", histo_bins["njet"]),
 
-                (arr[:, 3], "mu1_pt", histo_bins["mu_pt"]),
-                (arr[:, 4], "mu1_eta", histo_bins["mu_eta"]),
-                (arr[:, 5], "mu1_phi", histo_bins["mu_phi"]),
-                (arr[:, 6], "mu1_charge", histo_bins["mu_charge"]),
-                (arr[:, 7], "mu1_iso", histo_bins["mu_iso"]),
+                (mu1["pt"], "mu1_pt", histo_bins["mu_pt"]),
+                (mu1["eta"], "mu1_eta", histo_bins["mu_eta"]),
+                (mu1["phi"], "mu1_phi", histo_bins["mu_phi"]),
+                (mu1["charge"], "mu1_charge", histo_bins["mu_charge"]),
+                (mu1["pfRelIso03_all"], "mu1_iso", histo_bins["mu_iso"]),
 
-                (arr[:, 8], "mu2_pt", histo_bins["mu_pt"]),
-                (arr[:, 9], "mu2_eta", histo_bins["mu_eta"]),
-                (arr[:, 10], "mu2_phi", histo_bins["mu_phi"]),
-                (arr[:, 11], "mu2_charge", histo_bins["mu_charge"]),
-                (arr[:, 12], "mu2_iso", histo_bins["mu_iso"]),
+                (mu2["pt"], "mu2_pt", histo_bins["mu_pt"]),
+                (mu2["eta"], "mu2_eta", histo_bins["mu_eta"]),
+                (mu2["phi"], "mu2_phi", histo_bins["mu_phi"]),
+                (mu2["charge"], "mu2_charge", histo_bins["mu_charge"]),
+                (mu2["pfRelIso03_all"], "mu2_iso", histo_bins["mu_iso"]),
 
-                (arr[:, 13], "el1_pt", histo_bins["mu_pt"]),
-                (arr[:, 14], "el1_eta", histo_bins["mu_eta"]),
-                (arr[:, 15], "el1_phi", histo_bins["mu_phi"]),
-                (arr[:, 17], "el1_charge", histo_bins["mu_charge"]),
-                (arr[:, 18], "el1_iso", histo_bins["mu_iso"]),
+                (el1["pt"], "el1_pt", histo_bins["mu_pt"]),
+                (el1["eta"], "el1_eta", histo_bins["mu_eta"]),
+                (el1["phi"], "el1_phi", histo_bins["mu_phi"]),
+                (el1["charge"], "el1_charge", histo_bins["mu_charge"]),
+                (el1["pfRelIso03_all"], "el1_iso", histo_bins["mu_iso"]),
                 
-                (arr[:, 19], "el2_pt", histo_bins["mu_pt"]),
-                (arr[:, 20], "el2_eta", histo_bins["mu_eta"]),
-                (arr[:, 21], "el2_phi", histo_bins["mu_phi"]),
-                (arr[:, 22], "el2_charge", histo_bins["mu_charge"]),
-                (arr[:, 23], "el2_iso", histo_bins["mu_iso"]),
+                (el2["pt"], "el2_pt", histo_bins["mu_pt"]),
+                (el2["eta"], "el2_eta", histo_bins["mu_eta"]),
+                (el2["phi"], "el2_phi", histo_bins["mu_phi"]),
+                (el2["charge"], "el2_charge", histo_bins["mu_charge"]),
+                (el2["pfRelIso03_all"], "el2_iso", histo_bins["mu_iso"]),
+                
+                (jet1["pt"], "j1_pt", histo_bins["jet_pt"]),
+                (jet1["eta"], "j1_eta", histo_bins["jet_eta"]),
+                (jet1["phi"], "j1_phi", histo_bins["jet_phi"]),
+                (jet1["btag"], "j1_btag", histo_bins["jet_btag"]),
+                
+                (jet2["pt"], "j2_pt", histo_bins["jet_pt"]),
+                (jet2["eta"], "j2_eta", histo_bins["jet_eta"]),
+                (jet2["phi"], "j2_phi", histo_bins["jet_phi"]),
+                (jet2["btag"], "j2_btag", histo_bins["jet_btag"]),
+                
+                (inv_mass_3j, "inv_mass_3j", histo_bins["inv_mass"]),
+                (best_btag, "best_btag", histo_bins["jet_btag"]),
+                (sumpt_jets, "sumpt", histo_bins["sumpt"]),
             ],
             selected_events,
             weights,
             use_cuda
         )
-
 
         #save the array for the first jet correction scenario only
         if save_arrays and ijec == 0:
@@ -421,7 +472,14 @@ def run_analysis(dataset, out, njec, use_cuda):
    
     speed = dataset.numevents() / (t1 - t0) 
     print("run_analysis: {0:.2E} events in {1:.2f} seconds, speed {2:.2E} Hz".format(dataset.numevents(), t1 - t0, speed))
-    return
+
+    res = Results({})
+    for hn in hists.keys():
+        hists[hn] = Results(hists[hn])
+    res["hists"] = Results(hists)
+    res["numevents"] = dataset.numevents()
+
+    return res
 
 def load_dataset(datapath, cachepath, filenames, ismc, nthreads, skip_cache, do_skim):
     ds = hepaccelerate.Dataset(
@@ -601,10 +659,26 @@ def parse_args():
     return args
 
 def load_and_analyze(args_tuple):
-    fn, args, njec, dataset, ismc, ichunk = args_tuple
+    fn, args, njec, dataset, ismc, ichunk, dnnmodel = args_tuple
+    print("Loading {0}".format(fn))
     ds = load_dataset(args.datapath, args.cachepath, fn, ismc, args.nthreads, args.nocache, args.skim)
-    run_analysis(ds, "{0}_{1}".format(dataset, ichunk), njec, args.cuda)
-    return ds.numevents()
+    ret = run_analysis(ds, dnnmodel, "{0}_{1}".format(dataset, ichunk), njec, args.cuda)
+    return ret
+
+parameters = {
+    "muon_pt_leading": 40,
+    "muon_pt": 20,
+    "muon_eta": 2.4,
+    "muon_iso": 0.3,
+    "electron_pt_leading": 40,
+    "electron_pt": 20,
+    "electron_eta": 2.4,
+    "electron_iso": 0.3,
+    "jet_pt": 30,
+    "jet_eta": 2.0,
+    "jet_lepton_dr": 0.3,
+    "jet_btag": 0.4
+}
 
 if __name__ == "__main__":
     args = parse_args()
@@ -612,6 +686,26 @@ if __name__ == "__main__":
     files_per_job = 2
 
     NUMPY_LIB, ha = hepaccelerate.choose_backend(args.cuda)
+    
+    import tensorflow as tf
+    config = tf.ConfigProto()
+    config.intra_op_parallelism_threads=args.nthreads
+    config.inter_op_parallelism_threads=args.nthreads
+
+    if not args.cuda: 
+        os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+    else:
+        from keras.backend.tensorflow_backend import set_session
+        import tensorflow as tf
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = False
+        gpu_memory_fraction = 0.2
+        config.gpu_options.per_process_gpu_memory_fraction = gpu_memory_fraction
+    import keras
+
+    from keras.backend.tensorflow_backend import set_session
+    set_session(tf.Session(config=config))
+
     if args.cuda:
         import cuda_kernels as kernels
     else:
@@ -619,16 +713,19 @@ if __name__ == "__main__":
 
     electron_weights = NUMPY_LIB.zeros((100, 2), dtype=NUMPY_LIB.float32)
     electron_weights[:, 0] = NUMPY_LIB.linspace(0, 200, electron_weights.shape[0])[:]
-    electron_weights[:, 1] = NUMPY_LIB.random.normal(loc=1.0, scale=0.1, size=electron_weights.shape[0])[:]
+    electron_weights[:, 1] = NUMPY_LIB.random.normal(loc=1.0, scale=0.001, size=electron_weights.shape[0])[:]
 
     njec = 1
     if args.ismc:
-        njec = 50
+        njec = 1
+
+    #dnnmodel = DNNModel()
+    dnnmodel = None
 
     if len(args.filenames) > 0:
         print("Processing the provided files")
         ds = load_dataset(args.datapath, args.cachepath, args.filenames, args.ismc, args.nthreads, args.nocache, args.skim)
-        run_analysis(ds, args.out, njec, args.cuda)
+        ret = [run_analysis(ds, dnnmodel, args.out, njec, args.cuda)]
     else:
         print("Processing all datasets")
         datasets = [
@@ -646,17 +743,29 @@ if __name__ == "__main__":
         for dataset, fn_pattern, ismc in datasets:
             filenames = glob.glob(args.datapath + fn_pattern)
             ichunk = 0
-            for fn in chunks(filenames, files_per_job):
-                arglist += [(fn, args, njec, dataset, ismc, ichunk)]
+            for fn in chunks(filenames, 2):
+                arglist += [(fn, args, njec, dataset, ismc, ichunk, dnnmodel)]
                 ichunk += 1
 
-        full_t0 = time.time()
         if args.njobs == 1:
             ret = map(load_and_analyze, arglist)
         else:
             pool = multiprocessing.Pool(args.njobs)
             ret = pool.map(load_and_analyze, arglist)
             pool.close()
-        full_t1 = time.time()
-        Nev = sum(ret)
-        print(Nev, full_t1 - full_t0)
+
+        print("Merging outputs")
+        hists = {ds[0]: [] for ds in datasets}
+        numevents = {ds[0]: 0 for ds in datasets}
+        for r, args in zip(ret, arglist):
+            rh = r["hists"]
+            ds = args[3]
+            hists[ds] += [Results(r["hists"])]
+            numevents[ds] += r["numevents"]
+
+        for k, v in hists.items():
+            hists[k] = sum(hists[k], Results({}))
+        
+        print("Writing output pkl")
+        with open("out.pkl", "wb") as fi:
+            pickle.dump({"hists": hists, "numevents": numevents}, fi)
