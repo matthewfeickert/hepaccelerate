@@ -3,7 +3,7 @@
 set -e
 
 function run() {
-    export SINGULARITY_IMAGE=/storage/user/jpata/cupy2.simg
+    export SINGULARITY_IMAGE=/storage/user/jpata/gpuservers/singularity/images/cupy.simg
     export NUMBA_NUM_THREADS=$1
     export OMP_NUM_THREADS=$1
     export HEPACCELERATE_CUDA=$2

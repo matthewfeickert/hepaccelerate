@@ -21,10 +21,10 @@ def layer(din, n_units, do_dropout=True):
 
 
 datasets = [
-    ("TTJets_SemiLeptMGDecays_0_arrs.npy", 0),
-    ("TTJets_SemiLeptMGDecays_1_arrs.npy", 0),
-    ("TTJets_SemiLeptMGDecays_2_arrs.npy", 0),
-    ("GluGluToHToMM_0_arrs.npy", 1),
+    ("data/TTJets_SemiLeptMGDecays_0_arrs.npy", 0),
+    ("data/TTJets_SemiLeptMGDecays_1_arrs.npy", 0),
+    ("data/TTJets_SemiLeptMGDecays_2_arrs.npy", 0),
+    ("data/GluGluToHToMM_0_arrs.npy", 1),
 ]
 
 Xs = []
@@ -71,5 +71,5 @@ for train_index, test_index in kf.split(X):
     model.fit(X[train_index], y[train_index], sample_weight=weights[train_index],
         validation_data=[X[test_index], y[test_index], weights[test_index]],
         epochs=100, batch_size=5000)
-    model.save("model2_kf{0}.h5".format(ikf))
+    model.save("data/model_kf{0}.h5".format(ikf))
     ikf += 1

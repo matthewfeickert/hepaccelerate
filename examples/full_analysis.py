@@ -16,17 +16,21 @@ import numba
 from numba import cuda
 
 save_arrays = False
+use_cuda = bool(int(os.environ.get("HEPACCELERATE_CUDA", 0)))
+
+gpu_id_list = [0, 1]
 
 class DNNModel:
     def __init__(self):
+        import keras
         self.models = [
-            keras.models.load_model("model_kf{0}.h5".format(i)) for i in [0, 1, 2, 3, 4]
+            keras.models.load_model("data/model_kf{0}.h5".format(i)) for i in [0, 1]
         ]
 
     def eval(self, X, use_cuda):
         if use_cuda:
             X = NUMPY_LIB.asnumpy(X)
-        rets = [NUMPY_LIB.array(m.predict(X, batch_size=1000000)[:, 0]) for m in self.models]
+        rets = [NUMPY_LIB.array(m.predict(X, batch_size=10000)[:, 0]) for m in self.models]
         return rets
 
 def create_datastructure(ismc):
@@ -142,10 +146,10 @@ def apply_lepton_corrections(leptons, mask_leptons, lepton_weights):
     
     return corr_per_event
 
-def apply_jec(jets, jecs):
+def apply_jec(jets, bins, jecs):
     corrs = NUMPY_LIB.zeros_like(jets.pt)
-    ha.get_bin_contents(jets.pt, jecs[:, 0], jecs[:-1, 1], corrs)
-    return NUMPY_LIB.abs(corrs)
+    ha.get_bin_contents(jets.pt, bins, jecs, corrs)
+    return 1.0 + corrs
 
 def select_jets(jets, mu, el, selected_muons, selected_electrons, pt_cut, aeta_cut, jet_lepton_dr_cut, btag_cut):
     passes_id = jets.puId == True
@@ -237,7 +241,7 @@ def update_histograms_systematic(hists, hist_name, systematic_name, target_histo
         target_histogram = {syst_string: target_histogram["nominal"]}
         hists[hist_name].update(target_histogram)
 
-def run_analysis(dataset, dnnmodel, out, njec, use_cuda):
+def run_analysis(dataset, out, dnnmodel, use_cuda, ismc):
     hists = {}
     histo_bins = {
         "nmu": np.array([0,1,2,3], dtype=np.float32),
@@ -303,8 +307,11 @@ def run_analysis(dataset, dnnmodel, out, njec, use_cuda):
         weights_jet[k] = NUMPY_LIB.zeros_like(jets.pt)
         ha.broadcast(weights["nominal"], jets.offsets, weights_jet[k])
 
-    all_jecs = [(njec, "up", electron_weights) for i in range(njec)]
-    all_jecs += [(njec, "down", electron_weights) for i in range(njec)]
+    all_jecs = [("nominal", "", None)]
+    if ismc:
+        for i in range(jecs_up.shape[1]):
+            all_jecs += [(i, "up", jecs_up[:, i])]
+            all_jecs += [(i, "down", jecs_down[:, i])]
     
     jets_pt_orig = NUMPY_LIB.copy(jets.pt)
 
@@ -332,11 +339,11 @@ def run_analysis(dataset, dnnmodel, out, njec, use_cuda):
     print("Jet selection")
     #loop over the jet corrections
     for ijec, sdir, jec in all_jecs:
-        print("JEC {0} {1}".format(ijec, sdir))
-        #jet_pt_corr = apply_jec(jets, jec)
-
-        #compute the corrected jet pt        
-        #jets.pt = jets_pt_orig * jet_pt_corr
+        if not jec is None:
+            jet_pt_corr = apply_jec(jets, jecs_bins, jec)
+            print("jec", ijec, sdir, jet_pt_corr.mean())
+            #compute the corrected jet pt        
+            jets.pt = jets_pt_orig * NUMPY_LIB.abs(jet_pt_corr)
 
         #get selected jets
         sel_jet, sel_bjet = select_jets(jets, mu, el, sel_mu, sel_el, 40, 2.0, 0.3, 0.4)
@@ -404,10 +411,10 @@ def run_analysis(dataset, dnnmodel, out, njec, use_cuda):
         ]).T
        
         print("evaluating DNN model") 
-        #pred = dnnmodel.eval(arr, use_cuda)
-        #pred = NUMPY_LIB.vstack(pred).T
-        #pred_m = NUMPY_LIB.mean(pred, axis=1)
-        #pred_s = NUMPY_LIB.std(pred, axis=1)
+        pred = dnnmodel.eval(arr, use_cuda)
+        pred = NUMPY_LIB.vstack(pred).T
+        pred_m = NUMPY_LIB.mean(pred, axis=1)
+        pred_s = NUMPY_LIB.std(pred, axis=1)
 
         fill_histograms_several(
             hists, ("jec{0}".format(ijec), sdir), "hist__nmu1_njet4_nbjet1__",
@@ -470,8 +477,6 @@ def run_analysis(dataset, dnnmodel, out, njec, use_cuda):
 
     t1 = time.time()
    
-    speed = dataset.numevents() / (t1 - t0) 
-    print("run_analysis: {0:.2E} events in {1:.2f} seconds, speed {2:.2E} Hz".format(dataset.numevents(), t1 - t0, speed))
 
     res = Results({})
     for hn in hists.keys():
@@ -479,6 +484,8 @@ def run_analysis(dataset, dnnmodel, out, njec, use_cuda):
     res["hists"] = Results(hists)
     res["numevents"] = dataset.numevents()
 
+    speed = dataset.numevents() / (t1 - t0) 
+    print("run_analysis: {0:.2E} events in {1:.2f} seconds, speed {2:.2E} Hz".format(dataset.numevents(), t1 - t0, speed))
     return res
 
 def load_dataset(datapath, cachepath, filenames, ismc, nthreads, skip_cache, do_skim):
@@ -492,14 +499,19 @@ def load_dataset(datapath, cachepath, filenames, ismc, nthreads, skip_cache, do_
     )
     
     cache_valid = ds.check_cache()
-    
+   
+    timing_results = {}
+ 
     if skip_cache or not cache_valid:
-        t0 = time.time()
         
         #Load the ROOT files
         print("Loading dataset from {0} files".format(len(ds.filenames)))
-        ds.preload(nthreads=nthreads, verbose=True)
-        ds.make_objects(verbose=True)
+        t0 = time.time()
+        ds.preload(nthreads=nthreads)
+        t1 = time.time()
+        timing_results["load_root"] = t1 - t0
+
+        ds.make_objects()
         ds.cache_metadata = ds.create_cache_metadata()
         print("Loaded dataset, {0:.2f} MB, {1} files, {2} events".format(ds.memsize() / 1024 / 1024, len(ds.filenames), ds.numevents()))
     
@@ -510,16 +522,18 @@ def load_dataset(datapath, cachepath, filenames, ismc, nthreads, skip_cache, do_
             print("Applied trigger bit selection skim, {0:.2f} MB, {1} files, {2} events".format(ds.memsize() / 1024 / 1024, len(ds.filenames), ds.numevents()))
     
         print("Saving skimmed data to uncompressed cache")
-        ds.to_cache(nthreads=nthreads, verbose=True)
+        t0 = time.time()
+        ds.to_cache(nthreads=nthreads)
         t1 = time.time()
+        timing_results["to_cache"] = t1 - t0
         speed = ds.numevents() / (t1 - t0)
         print("load_dataset: {0:.2E} events / second".format(speed))
     else:
-        t0 = time.time()
         print("Loading from existing cache")
+        t0 = time.time()
         ds.from_cache(verbose=True)
         t1 = time.time()
-        t1 = time.time()
+        timing_results["from_cache"] = t1 - t0
         speed = ds.numevents() / (t1 - t0)
         print("load_dataset: {0:.2E} events / second".format(speed))
     
@@ -529,17 +543,23 @@ def load_dataset(datapath, cachepath, filenames, ismc, nthreads, skip_cache, do_
   
     print("Merging arrays from multiple files using awkward") 
     #Now merge all the arrays across the files to have large contiguous data
+    t0 = time.time()
     ds.merge_inplace()
+    t1 = time.time()
+    timing_results["merge_inplace"] = t1 - t0
     
     print("Copying to device")
     #transfer dataset to device (GPU) if applicable
+    t0 = time.time()
     ds.move_to_device(NUMPY_LIB)
+    t1 = time.time()
+    timing_results["move_to_device"] = t1 - t0
     ds.numpy_lib = NUMPY_LIB
 
     avg_vec_length = np.mean(np.array([[v["pt"].shape[0] for v in ds.structs[ss]] for ss in ds.structs.keys()]))
     print("Average vector length after merging: {0:.0f}".format(avg_vec_length))
 
-    return ds
+    return ds, timing_results
 
 def compute_inv_mass(objects, mask_events, mask_objects, use_cuda):
     inv_mass = NUMPY_LIB.zeros(len(mask_events), dtype=np.float32)
@@ -644,26 +664,89 @@ def parse_args():
         help='Specify if skim should be done')
     parser.add_argument('--nocache', action='store_true',
         help='Flag to specify if branch cache will be skipped')
-    parser.add_argument('--cuda', action='store_true',
-        help='Use the cuda backend')
     parser.add_argument('--nthreads', action='store',
         help='Number of parallel threads', default=1, type=int)
     parser.add_argument('--out', action='store',
-        help='Output file name', default="out")
+        help='Output file name', default="out.pkl")
     parser.add_argument('--njobs', action='store',
         help='Number of multiprocessing jobs', default=1, type=int)
+    parser.add_argument('--njec', action='store',
+        help='Number of JEC scenarios', default=20, type=int)
 
     parser.add_argument('filenames', nargs=argparse.REMAINDER)
  
     args = parser.parse_args()
     return args
 
+def multiprocessing_initializer(args, use_cuda):
+    global dnnmodel, NUMPY_LIB, ha
+    global electron_weights, jecs_bins, jecs_up, jecs_down
+    global kernels
+
+    import tensorflow as tf
+    config = tf.ConfigProto()
+    config.intra_op_parallelism_threads=args.nthreads
+    config.inter_op_parallelism_threads=args.nthreads
+    if not use_cuda: 
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    else:
+        cpu_name = multiprocessing.current_process().name
+        if cpu_name == "MainProcess":
+            import setGPU
+        else: 
+            cpu_id = int(cpu_name[cpu_name.find('-') + 1:]) - 1
+            gpu_id = gpu_id_list[cpu_id]
+            print("process {0} choosing GPU {1}".format(cpu_name, gpu_id))
+            os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+
+        from keras.backend.tensorflow_backend import set_session
+        import tensorflow as tf
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = False
+        gpu_memory_fraction = 0.2
+        config.gpu_options.per_process_gpu_memory_fraction = gpu_memory_fraction
+
+    from keras.backend.tensorflow_backend import set_session
+    set_session(tf.Session(config=config))
+    dnnmodel = DNNModel()
+    
+    NUMPY_LIB, ha = hepaccelerate.choose_backend(use_cuda)
+    if use_cuda:
+        import cuda_kernels as kernels
+    else:
+        import cpu_kernels as kernels
+
+    #Create random vectors as placeholders of lepton pt event weights
+    electron_weights = NUMPY_LIB.zeros((100, 2), dtype=NUMPY_LIB.float32)
+    electron_weights[:, 0] = NUMPY_LIB.linspace(0, 200, electron_weights.shape[0])[:]
+    electron_weights[:, 1] = electron_weights[:, 0] * NUMPY_LIB.array(np.random.normal(loc=1.0, scale=0.001, size=electron_weights.shape[0]))[:]
+    
+    #Create random vectors as placeholders of pt-dependent jet energy corrections
+    jecs_bins = NUMPY_LIB.zeros(100, dtype=NUMPY_LIB.float32 ) 
+    jecs_up = NUMPY_LIB.zeros((99, args.njec), dtype=NUMPY_LIB.float32)
+    jecs_down = NUMPY_LIB.zeros((99, args.njec), dtype=NUMPY_LIB.float32)
+    jecs_bins[:] = NUMPY_LIB.linspace(0, 200, jecs_bins.shape[0])[:]
+
+    for i in range(args.njec):
+        rnd = np.random.normal(loc=0.0, scale=i*0.01 + 0.01, size=jecs_up.shape[0])
+        jecs_up[:, i] = jecs_bins[:-1] * NUMPY_LIB.array(rnd) 
+        jecs_down[:, i] = jecs_bins[:-1] * NUMPY_LIB.array(-rnd) 
+    
+
 def load_and_analyze(args_tuple):
-    fn, args, njec, dataset, ismc, ichunk, dnnmodel = args_tuple
-    NUMPY_LIB, ha = hepaccelerate.choose_backend(args.cuda)
+    fn, args, dataset, ismc, ichunk = args_tuple
+    global dnnmodel
+    
+    NUMPY_LIB, ha = hepaccelerate.choose_backend(use_cuda)
+    
     print("Loading {0}".format(fn))
-    ds = load_dataset(args.datapath, args.cachepath, fn, ismc, args.nthreads, args.nocache, args.skim)
-    ret = run_analysis(ds, dnnmodel, "{0}_{1}".format(dataset, ichunk), njec, args.cuda)
+    ds, timing_results = load_dataset(args.datapath, args.cachepath, fn, ismc, args.nthreads, args.nocache, args.skim)
+    t0 = time.time()
+    ret = run_analysis(ds, "{0}_{1}".format(dataset, ichunk), dnnmodel, use_cuda, ismc)
+    t1 = time.time()
+    ret["timing"] = Results(timing_results)
+    ret["timing"]["run_analysis"] = t1 - t0
+    ret["timing"]["num_events"] = ds.numevents()
     return ret
 
 parameters = {
@@ -682,51 +765,24 @@ parameters = {
 }
 
 if __name__ == "__main__":
+    np.random.seed(0)
     args = parse_args()
-
-    files_per_job = 2
-
-    NUMPY_LIB, ha = hepaccelerate.choose_backend(args.cuda)
-    
-    import tensorflow as tf
-    config = tf.ConfigProto()
-    config.intra_op_parallelism_threads=args.nthreads
-    config.inter_op_parallelism_threads=args.nthreads
-
-    if not args.cuda: 
-        os.environ["CUDA_VISIBLE_DEVICES"]="-1"
-    else:
-        from keras.backend.tensorflow_backend import set_session
-        import tensorflow as tf
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = False
-        gpu_memory_fraction = 0.2
-        config.gpu_options.per_process_gpu_memory_fraction = gpu_memory_fraction
-    import keras
-
-    from keras.backend.tensorflow_backend import set_session
-    set_session(tf.Session(config=config))
-
-    if args.cuda:
-        import cuda_kernels as kernels
-    else:
-        import cpu_kernels as kernels
-
-    electron_weights = NUMPY_LIB.zeros((100, 2), dtype=NUMPY_LIB.float32)
-    electron_weights[:, 0] = NUMPY_LIB.linspace(0, 200, electron_weights.shape[0])[:]
-    electron_weights[:, 1] = NUMPY_LIB.random.normal(loc=1.0, scale=0.001, size=electron_weights.shape[0])[:]
-
-    njec = 1
-    if args.ismc:
-        njec = 1
-
-    #dnnmodel = DNNModel()
-    dnnmodel = None
+    print(args)
 
     if len(args.filenames) > 0:
         print("Processing the provided files")
-        ds = load_dataset(args.datapath, args.cachepath, args.filenames, args.ismc, args.nthreads, args.nocache, args.skim)
-        ret = [run_analysis(ds, dnnmodel, args.out, njec, args.cuda)]
+        multiprocessing_initializer(args, use_cuda)
+        walltime_t0 = time.time()
+        ret = load_and_analyze((args.filenames, args, "dataset", args.ismc, 0))
+        walltime_t1 = time.time()
+        timing = ret["timing"]
+        timing["cuda"] = use_cuda
+        timing["njec"] = args.njec
+        timing["nthreads"] = args.nthreads
+        timing["walltime"] = walltime_t1 - walltime_t0
+        print("Writing output pkl")
+        with open(args.out, "wb") as fi:
+            pickle.dump({"hists": ret["hists"], "numevents": ret["numevents"], "timing": timing}, fi)
     else:
         print("Processing all datasets")
         datasets = [
@@ -741,32 +797,47 @@ if __name__ == "__main__":
             ("SingleMu", "/opendata_files/SingleMu-merged/*.root", False),
         ]
         arglist = []
+
+        walltime_t0 = time.time()
         for dataset, fn_pattern, ismc in datasets:
             filenames = glob.glob(args.datapath + fn_pattern)
+            if(len(filenames) == 0):
+                raise Exception("Could not find any filenames for {0}: {1} {2}".format(dataset, args.datapath, fn_pattern))
             ichunk = 0
-            for fn in chunks(filenames, 2):
-                arglist += [(fn, args, njec, dataset, ismc, ichunk, dnnmodel)]
+            for fn in chunks(filenames, 1):
+                arglist += [(fn, args, dataset, ismc, ichunk)]
                 ichunk += 1
 
+        print("Processing {0} arguments".format(len(arglist)))
         if args.njobs == 1:
-            ret = map(load_and_analyze, arglist)
+            multiprocessing_initializer(args, use_cuda)
+            ret = [load_and_analyze(a) for a in arglist]
         else:
-            pool = multiprocessing.Pool(args.njobs)
+            ctx = multiprocessing.get_context('spawn')
+            pool = ctx.Pool(args.njobs, multiprocessing_initializer, [args, use_cuda])
             ret = pool.map(load_and_analyze, arglist)
-            pool.close()
+            print("map is done")
+            pool.terminate()
+        walltime_t1 = time.time()
 
         print("Merging outputs")
         hists = {ds[0]: [] for ds in datasets}
         numevents = {ds[0]: 0 for ds in datasets}
-        for r, args in zip(ret, arglist):
+        for r, _args in zip(ret, arglist):
             rh = r["hists"]
-            ds = args[3]
+            ds = _args[2]
             hists[ds] += [Results(r["hists"])]
             numevents[ds] += r["numevents"]
+
+        timing = sum([r["timing"] for r in ret], Results({}))
+        timing["cuda"] = use_cuda
+        timing["njec"] = args.njec
+        timing["nthreads"] = args.nthreads
+        timing["walltime"] = walltime_t1 - walltime_t0
 
         for k, v in hists.items():
             hists[k] = sum(hists[k], Results({}))
         
         print("Writing output pkl")
-        with open("out.pkl", "wb") as fi:
-            pickle.dump({"hists": hists, "numevents": numevents}, fi)
+        with open(args.out, "wb") as fi:
+            pickle.dump({"hists": hists, "numevents": numevents, "timing": timing}, fi)
