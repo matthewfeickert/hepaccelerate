@@ -24,7 +24,7 @@ class DNNModel:
     def __init__(self):
         import keras
         self.models = [
-            keras.models.load_model("data/model_kf{0}.h5".format(i)) for i in [0, 1]
+            keras.models.load_model("data/model_kf{0}.h5".format(i)) for i in [0, ]
         ]
 
     def eval(self, X, use_cuda):
@@ -61,7 +61,6 @@ def create_datastructure(ismc):
             ("Jet_btag", "float32"),
             ("Jet_puId", "bool"),
         ],
-
         "EventVariables": [
             ("HLT_IsoMu24", "bool"),
             ('MET_pt', 'float32'),
@@ -71,6 +70,7 @@ def create_datastructure(ismc):
             ('MET_CovXX', 'float32'),
             ('MET_CovXY', 'float32'),
             ('MET_CovYY', 'float32'),
+            ('PV_npvs', 'int32'),
         ]
     }
     if ismc:
@@ -146,9 +146,9 @@ def apply_lepton_corrections(leptons, mask_leptons, lepton_weights):
     
     return corr_per_event
 
-def apply_jec(jets, bins, jecs):
-    corrs = NUMPY_LIB.zeros_like(jets.pt)
-    ha.get_bin_contents(jets.pt, bins, jecs, corrs)
+def apply_jec(jets_pt_orig, bins, jecs):
+    corrs = NUMPY_LIB.zeros_like(jets_pt_orig)
+    ha.get_bin_contents(jets_pt_orig, bins, jecs, corrs)
     return 1.0 + corrs
 
 def select_jets(jets, mu, el, selected_muons, selected_electrons, pt_cut, aeta_cut, jet_lepton_dr_cut, btag_cut):
@@ -246,20 +246,20 @@ def run_analysis(dataset, out, dnnmodel, use_cuda, ismc):
     histo_bins = {
         "nmu": np.array([0,1,2,3], dtype=np.float32),
         "njet": np.array([0,1,2,3,4,5,6,7], dtype=np.float32),
-        "mu_pt": np.linspace(0, 300, 100),
-        "mu_eta": np.linspace(-5, 5, 100),
-        "mu_phi": np.linspace(-5, 5, 100),
-        "mu_iso": np.linspace(0, 1, 100),
+        "mu_pt": np.linspace(0, 300, 20),
+        "mu_eta": np.linspace(-5, 5, 20),
+        "mu_phi": np.linspace(-5, 5, 20),
+        "mu_iso": np.linspace(0, 1, 20),
         "mu_charge": np.array([-1, 0, 1], dtype=np.float32),
-        "met_pt": np.linspace(0,200,100),
-        "jet_pt": np.linspace(0,200,100),
-        "jet_eta": np.linspace(-5,5,100),
-        "jet_phi": np.linspace(-5,5,100),
-        "jet_btag": np.linspace(0,1,100),
-        "dnnpred_m": np.linspace(0,1,100),
-        "dnnpred_s": np.linspace(0,0.2,100),
-        "inv_mass": np.linspace(150,200, 100),
-        "sumpt": np.linspace(0,1000,100),
+        "met_pt": np.linspace(0,200,20),
+        "jet_pt": np.linspace(0,400,20),
+        "jet_eta": np.linspace(-5,5,20),
+        "jet_phi": np.linspace(-5,5,20),
+        "jet_btag": np.linspace(0,1,20),
+        "dnnpred_m": np.linspace(0,1,20),
+        "dnnpred_s": np.linspace(0,0.2,20),
+        "inv_mass": np.linspace(150,200, 20),
+        "sumpt": np.linspace(0,1000,20),
     }
 
     t0 = time.time()
@@ -339,11 +339,15 @@ def run_analysis(dataset, out, dnnmodel, use_cuda, ismc):
     print("Jet selection")
     #loop over the jet corrections
     for ijec, sdir, jec in all_jecs:
+        systname = "nominal"
+        if ijec != "nominal":
+            systname = ("jec{0}".format(ijec), sdir)
+ 
         if not jec is None:
-            jet_pt_corr = apply_jec(jets, jecs_bins, jec)
-            print("jec", ijec, sdir, jet_pt_corr.mean())
+            jet_pt_corr = apply_jec(jets_pt_orig, jecs_bins, jec)
             #compute the corrected jet pt        
             jets.pt = jets_pt_orig * NUMPY_LIB.abs(jet_pt_corr)
+        print("jec", ijec, sdir, jets.pt.mean())
 
         #get selected jets
         sel_jet, sel_bjet = select_jets(jets, mu, el, sel_mu, sel_el, 40, 2.0, 0.3, 0.4)
@@ -372,9 +376,9 @@ def run_analysis(dataset, out, dnnmodel, use_cuda, ismc):
         else:
             kernels.max_val_comb(jets.btag, jets.offsets, best_comb_3j, best_btag)
 
-        #get the events with at least two jets
-        sel_ev_jet = (njet >= 4)
-        sel_ev_bjet = (nbjet >= 1)
+        #get the events with at least three jets
+        sel_ev_jet = (njet >= 3)
+        sel_ev_bjet = (nbjet >= 0)
         
         selected_events = sel_ev_mu & sel_ev_el & sel_ev_jet & sel_ev_bjet
         print("Selected {0} events".format(selected_events.sum()))
@@ -382,7 +386,7 @@ def run_analysis(dataset, out, dnnmodel, use_cuda, ismc):
         #get contiguous vectors of the first two jet data
         jet1 = jets.select_nth(0, object_mask=sel_jet)
         jet2 = jets.select_nth(1, object_mask=sel_jet)
-        jet3 = jets.select_nth(3, object_mask=sel_jet)
+        jet3 = jets.select_nth(2, object_mask=sel_jet)
        
         #create a mask vector for the first two jets 
         first_two_jets = NUMPY_LIB.zeros_like(sel_jet)
@@ -411,13 +415,13 @@ def run_analysis(dataset, out, dnnmodel, use_cuda, ismc):
         ]).T
        
         print("evaluating DNN model") 
-        pred = dnnmodel.eval(arr, use_cuda)
-        pred = NUMPY_LIB.vstack(pred).T
-        pred_m = NUMPY_LIB.mean(pred, axis=1)
-        pred_s = NUMPY_LIB.std(pred, axis=1)
+        #pred = dnnmodel.eval(arr, use_cuda)
+        #pred = NUMPY_LIB.vstack(pred).T
+        #pred_m = NUMPY_LIB.mean(pred, axis=1)
+        #pred_s = NUMPY_LIB.std(pred, axis=1)
 
         fill_histograms_several(
-            hists, ("jec{0}".format(ijec), sdir), "hist__nmu1_njet4_nbjet1__",
+            hists, systname, "hist__nmu1_njetge3_nbjetge0__",
             [
                 #(pred_m, "pred_m", histo_bins["dnnpred_m"]),
                 #(pred_s, "pred_s", histo_bins["dnnpred_s"]),
@@ -719,7 +723,7 @@ def multiprocessing_initializer(args, use_cuda):
     #Create random vectors as placeholders of lepton pt event weights
     electron_weights = NUMPY_LIB.zeros((100, 2), dtype=NUMPY_LIB.float32)
     electron_weights[:, 0] = NUMPY_LIB.linspace(0, 200, electron_weights.shape[0])[:]
-    electron_weights[:, 1] = electron_weights[:, 0] * NUMPY_LIB.array(np.random.normal(loc=1.0, scale=0.001, size=electron_weights.shape[0]))[:]
+    electron_weights[:, 1] = 1.0
     
     #Create random vectors as placeholders of pt-dependent jet energy corrections
     jecs_bins = NUMPY_LIB.zeros(100, dtype=NUMPY_LIB.float32 ) 
@@ -728,10 +732,8 @@ def multiprocessing_initializer(args, use_cuda):
     jecs_bins[:] = NUMPY_LIB.linspace(0, 200, jecs_bins.shape[0])[:]
 
     for i in range(args.njec):
-        rnd = np.random.normal(loc=0.0, scale=i*0.01 + 0.01, size=jecs_up.shape[0])
-        jecs_up[:, i] = jecs_bins[:-1] * NUMPY_LIB.array(rnd) 
-        jecs_down[:, i] = jecs_bins[:-1] * NUMPY_LIB.array(-rnd) 
-    
+        jecs_up[:, i] = 0.3*(float(i+1)/float(args.njec)) 
+        jecs_down[:, i] = -0.3*(float(i+1)/float(args.njec)) 
 
 def load_and_analyze(args_tuple):
     fn, args, dataset, ismc, ichunk = args_tuple
@@ -774,6 +776,7 @@ if __name__ == "__main__":
         multiprocessing_initializer(args, use_cuda)
         walltime_t0 = time.time()
         ret = load_and_analyze((args.filenames, args, "dataset", args.ismc, 0))
+        print(np.sum(ret["hists"]["hist__nmu1_njetge3_nbjetge0__inv_mass_3j"]["nominal"].contents))
         walltime_t1 = time.time()
         timing = ret["timing"]
         timing["cuda"] = use_cuda
