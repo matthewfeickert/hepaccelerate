@@ -1,5 +1,5 @@
 #usr/bin/env python3
-#Run as PYTHONPATH=. python3 tests/example.py
+#Run as PYTHONPATH=. python3 examples/simple_hzz.py
 
 #In case you use CUDA, you may have to find the libnvvm.so on your system manually
 import os
@@ -11,7 +11,8 @@ import hepaccelerate
 from hepaccelerate.utils import Results, Dataset, Histogram, choose_backend
 
 #choose whether or not to use the GPU backend
-NUMPY_LIB, ha = choose_backend(use_cuda=False)
+use_cuda = int(os.environ.get("HEPACCELERATE_CUDA", 0)) == 1
+NUMPY_LIB, ha = choose_backend(use_cuda=use_cuda)
 
 #define our analysis function
 def analyze_data_function(data, parameters):
