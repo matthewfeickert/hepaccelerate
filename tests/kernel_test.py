@@ -53,7 +53,7 @@ class TestKernels(unittest.TestCase):
     @staticmethod
     def load_dataset(numpy_lib):
         print("loading dataset")
-        #download_if_not_exists("data/nanoaod_test.root", "https://jpata.web.cern.ch/jpata/nanoaod_test.root")
+        download_if_not_exists("data/nanoaod_test.root", "https://jpata.web.cern.ch/jpata/opendata_files/DY2JetsToLL-merged/1.root")
         datastructures = {
             "Muon": [
                 ("Muon_pt", "float32"),
@@ -93,7 +93,7 @@ class TestKernels(unittest.TestCase):
                 ('MET_CovYY', 'float32'),
             ]
         }
-        dataset = Dataset("nanoaod", 5*["/data/jpata/opendata_files/TTJets_SemiLeptMGDecays-merged/1.root"], datastructures, cache_location="./mycache/", treename="aod2nanoaod/Events", datapath="")
+        dataset = Dataset("nanoaod", 1*["./data/nanoaod_test.root"], datastructures, cache_location="./mycache/", treename="aod2nanoaod/Events", datapath="")
       
         try:
             dataset.from_cache()
