@@ -13,8 +13,8 @@ tests_cpu:
     - cp ${input_data_cache}/nanoaod_test.root ./data/nanoaod_test.root
     - HEPACCELERATE_CUDA=0 singularity exec --nv ${singularity_image} python3 setup.py test
     - PYTHONPATH=. HEPACCELERATE_CUDA=0 singularity exec --nv ${singularity_image} python3 examples/simple_hzz.py
-PYTHONPATH=. 
-#CUDA test is allowed to fail in case the GPUs are actively in use
+
+#CUDA test is allowed to fail in case the GPUs are not available
 tests_cuda:
   stage: tests_gpu
   allow_failure: true
