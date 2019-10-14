@@ -15,11 +15,15 @@ import math
 import numba
 from numba import cuda
 
-save_arrays = False
 use_cuda = bool(int(os.environ.get("HEPACCELERATE_CUDA", 0)))
 
+#save training arrays for DNN
+save_arrays = False
+
+#GPUs to use when multiprocessing
 gpu_id_list = [0, 1]
 
+#DNN weights produced using examples/train_dnn.py and setting save_arrays=True
 class DNNModel:
     def __init__(self):
         import keras
