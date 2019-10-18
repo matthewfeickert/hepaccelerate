@@ -832,7 +832,7 @@ if __name__ == "__main__":
 
     from dask.distributed import Client, LocalCluster
     from distributed import get_worker
-    cluster = LocalCluster(n_workers=1, threads_per_worker=1, memory_limit=4e9)
+    cluster = LocalCluster(n_workers=args.njobs, threads_per_worker=args.nthreads, memory_limit=2e9*args.nthreads)
     client = Client(cluster)
 
     #run initialization
