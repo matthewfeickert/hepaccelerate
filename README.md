@@ -6,10 +6,16 @@
 
 Simple example kernels with Numba for data analysis with jagged arrays. Run a full HEP analysis on a billion events to histograms in minutes on a single workstation. Weighted histograms, jet-lepton deltaR matching and more! Works on both the CPU and GPU!
 
+**Under active development, in use by a CMS Higgs analysis!**
+
 <p float="left">
   <img src="images/kernel_benchmarks.png" alt="Kernel benchmarks" width="300"/>
   <img src="images/analysis_scaling.png" alt="Analysis scaling" width="300"/>
 </p>
+
+More details are available:
+- writeup: https://arxiv.org/abs/1906.06242v2
+- PyHEP 2019 talk: https://indico.cern.ch/event/833895/contributions/3577804/attachments/1927026/3192574/2019_10_15_pyhep.pdf
 
 ## Installation
 
