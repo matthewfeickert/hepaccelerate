@@ -1,9 +1,8 @@
-import os, glob
-import uproot, time
+import os, glob, sys, time, argparse, multiprocessing
+import pickle, math, requests
 from collections import OrderedDict
-import argparse, multiprocessing
-import pickle, math
 
+import uproot
 import hepaccelerate
 from hepaccelerate.utils import Histogram, Results
 
@@ -35,6 +34,7 @@ def download_file(filename, url):
                 sys.stdout.write(".");sys.stdout.flush()
             iblock += 1
             fout.write(block)
+    print("download complete!")
 
 def download_if_not_exists(filename, url):
     """
@@ -53,8 +53,9 @@ def download_if_not_exists(filename, url):
 #DNN weights produced using examples/train_dnn.py and setting save_arrays=True
 class DNNModel:
     def __init__(self):
+        import keras
+        self.models = []
         for i in range(1):
-            download_if_not_exists("https://jpata.web.cern.ch/jpata/hepaccelerate/model_kf{0}.h5", "data/model_kf{0}.h5".format(i))
             self.models += [keras.models.load_model("data/model_kf{0}.h5".format(i))]
 
     def eval(self, X, use_cuda):
@@ -742,7 +743,10 @@ def parse_args():
     return args
 
 def multiprocessing_initializer(args, use_cuda):
-    this_worker = get_worker()
+    try:
+        this_worker = get_worker()
+    except Exception as e:
+        this_worker = None
 
     import tensorflow as tf
     config = tf.ConfigProto()
@@ -829,10 +833,13 @@ if __name__ == "__main__":
     np.random.seed(0)
     args = parse_args()
     args.use_cuda = use_cuda
+    for i in range(1):
+        download_if_not_exists("data/model_kf{0}.h5".format(i), "https://jpata.web.cern.ch/jpata/hepaccelerate/model_kf{0}.h5".format(i))
 
     from dask.distributed import Client, LocalCluster
     from distributed import get_worker
-    cluster = LocalCluster(n_workers=args.njobs, threads_per_worker=args.nthreads, memory_limit=2e9*args.nthreads)
+
+    cluster = LocalCluster(n_workers=args.njobs, threads_per_worker=args.nthreads, memory_limit=0)
     client = Client(cluster)
 
     #run initialization
@@ -888,3 +895,6 @@ if __name__ == "__main__":
     print("Writing output pkl")
     with open(args.out, "wb") as fi:
         pickle.dump({"hists": hists, "numevents": numevents, "timing": timing}, fi)
+    client.shutdown()
+    sum_numev = sum(numevents.values())
+    print("Processed {0} events in {1:.1f} seconds, {2:.2E} Hz".format(sum_numev, timing["walltime"], sum_numev / timing["walltime"]))
