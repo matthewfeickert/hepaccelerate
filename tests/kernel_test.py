@@ -93,7 +93,7 @@ class TestKernels(unittest.TestCase):
                 ('MET_CovYY', 'float32'),
             ]
         }
-        dataset = Dataset("nanoaod", 5*["./data/nanoaod_test.root"], datastructures, cache_location="./mycache/", treename="aod2nanoaod/Events", datapath="")
+        dataset = Dataset("nanoaod", ["./data/nanoaod_test.root"], datastructures, cache_location="./mycache/", treename="aod2nanoaod/Events", datapath="")
       
         try:
             dataset.from_cache()
