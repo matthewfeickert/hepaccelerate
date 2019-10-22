@@ -4,9 +4,9 @@
 
 # hepaccelerate
 
-Simple example kernels with Numba for data analysis with jagged arrays. Run a full HEP analysis on a billion events to histograms in minutes on a single workstation. Weighted histograms, jet-lepton deltaR matching and more! Works on both the CPU and GPU!
+Simple example kernels with Numba for data analysis with jagged arrays. You can use these to run a full HEP analysis on a billion events to histograms in minutes on a single workstation. Weighted histograms, jet-lepton deltaR matching and more! Works on both the CPU and GPU!
 
-**Under active development, in use by a CMS Higgs analysis!**
+**Under active development and use by a few CMS analyses!**
 
 <p float="left">
   <img src="images/kernel_benchmarks.png" alt="Kernel benchmarks" width="300"/>
