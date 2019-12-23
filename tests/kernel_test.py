@@ -257,7 +257,7 @@ class TestKernels(unittest.TestCase):
         return muons.numevents()
     
     def test_kernel_broadcast(self):
-        print("kernel_mask_deltar_first")
+        print("kernel_broadcast")
         dataset = self.dataset
         muons = dataset.structs["Muon"][0]
         met_pt = dataset.eventvars[0]["MET_pt"]
