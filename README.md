@@ -41,9 +41,9 @@ Optional libraries, which may be easier to install with conda:
 
 ## Documentation
 This code consists of two parts which can be used independently:
-  - the accelerated HEP kernels that run on jagged data:
-    - multithreaded CPU: [backend_cpu.py](https://github.com/hepaccelerate/hepaccelerate/blob/master/hepaccelerate/backend_cpu.py)
-    - CUDA GPU: [backend_cuda.py](https://github.com/hepaccelerate/hepaccelerate/blob/master/hepaccelerate/backend_cuda.py)  
+  - the accelerated HEP kernels that run on jagged data: [kernels.py](https://github.com/hepaccelerate/hepaccelerate/blob/master/hepaccelerate/kernels.py)
+    - CPU backend
+    - CUDA backend
   - JaggedStruct, Dataset and Histogram classes to help with HEP dataset management
 
 ### Environment variables
@@ -59,18 +59,18 @@ NUMBA_NUM_THREADS=1 #number of parallel threads for numba CPU kernels
 The jagged kernels work on the basis of the `content` and `offsets` arrays based on `awkward.JaggedArray` and can be used on any `numpy` or `cupy` data arrays.
 
 We have implemented the following kernels for both the CPU and CUDA backends:
-  - `ha.min_in_offsets(offsets, content, mask_rows, mask_content)`: retrieve the minimum value in a jagged array, given row and object masks
-  - `ha.max_in_offsets(offsets, content, mask_rows, mask_content)`: as above, but find the maximum
-  - `ha.prod_in_offsets(offsets, content, mask_rows, mask_content)`: compute the product in a jagged array
-  - `ha.set_in_offsets(content, offsets, indices, target, mask_rows, mask_content)`: set the indexed value in a jagged array to a target
-  - `ha.get_in_offsets(offsets, content, indices, mask_rows, mask_content)`:   retrieve the indexed values in a jagged array, e.g. get the leading jet pT
-  - `ha.compute_new_offsets(offsets_old, mask_objects, offsets_new)`: given an   awkward offset array and a mask, create an offset array of the unmasked elements
-  - `ha.searchsorted(bins, vals, side="left")`: 1-dimensional search in a sorted array
-  - `ha.histogram_from_vector(data, weights, bins, mask=None)`: fill a 1-dimensional weighted histogram with arbitrary sorted bins, possibly using a mask
-  - `ha.histogram_from_vector_several(variables, weights, mask)`: fill several histograms simultaneously based on `variables=[(data0, bins0), ...]`, this is more efficient on GPUs than many small kernel calls
-  - `ha.get_bin_contents(values, edges, contents, out)`: look up the bin contents of a histogram based on a vector of values 
-  - `ha.select_opposite_sign(muons, in_mask)`: select the first pair with opposite sign charge
-  - `ha.mask_deltar_first(objs1, mask1, objs2, mask2, drcut)`: given two collections of objects defined by eta, phi and offsets, mask the objects in the first collection that satisfy `DeltaR(o1, o2) < drcut)`
+  - `kernels.min_in_offsets(backend, offsets, content, mask_rows, mask_content)`: retrieve the minimum value in a jagged array, given row and object masks
+  - `kernels.max_in_offsets(backend, offsets, content, mask_rows, mask_content)`: as above, but find the maximum
+  - `kernels.prod_in_offsets(backend, offsets, content, mask_rows, mask_content)`: compute the product in a jagged array
+  - `kernels.set_in_offsets(backend, content, offsets, indices, target, mask_rows, mask_content)`: set the indexed value in a jagged array to a target
+  - `kernels.get_in_offsets(backend, offsets, content, indices, mask_rows, mask_content)`:   retrieve the indexed values in a jagged array, e.g. get the leading jet pT
+  - `kernels.compute_new_offsets(backend, offsets_old, mask_objects, offsets_new)`: given an   awkward offset array and a mask, create an offset array of the unmasked elements
+  - `kernels.searchsorted(backend, bins, vals, side="left")`: 1-dimensional search in a sorted array
+  - `kernels.histogram_from_vector(backend, data, weights, bins, mask=None)`: fill a 1-dimensional weighted histogram with arbitrary sorted bins, possibly using a mask
+  - `kernels.histogram_from_vector_several(backend, variables, weights, mask)`: fill several histograms simultaneously based on `variables=[(data0, bins0), ...]`, this is more efficient on GPUs than many small kernel calls
+  - `kernels.get_bin_contents(backend, values, edges, contents, out)`: look up the bin contents of a histogram based on a vector of values 
+  - `kernels.select_opposite_sign(backend, muons, in_mask)`: select the first pair with opposite sign charge
+  - `kernels.mask_deltar_first(backend, objs1, mask1, objs2, mask2, drcut)`: given two collections of objects defined by eta, phi and offsets, mask the objects in the first collection that satisfy `DeltaR(o1, o2) < drcut)`
 
 The kernels can be used as follows:
 ```python
@@ -90,7 +90,8 @@ sel_mu = numpy.ones(len(pxs), dtype=numpy.bool)
 
 #This is the same functionality as awkward.array.max, but supports either CPU or GPU!
 #Note that events with no entries will be filled with zeros rather than skipped
-event_max_px = ha.max_in_offsets(
+event_max_px = kernels.max_in_offsets(
+    backend, 
     offsets,
     pxs,
     sel_ev,
@@ -186,8 +187,8 @@ pip install tensorflow==1.15 keras dask distributed
 #Download the large input dataset, need ~150GB of free space in ./
 ./examples/download_example_data.sh ./
 
-#Starts a dask cluster and runs the analysis
-PYTHONPATH=. HEPACCELERATE_CUDA=0 python3 examples/full_analysis.py --out data/out.pkl --datapath ./
+#Starts a dask cluster and runs the analysis on all CPUs
+PYTHONPATH=. HEPACCELERATE_CUDA=0 python3 examples/full_analysis.py --out data/out.pkl --datapath ./ --dask-server ""
 ```
 
 The following methods are implemented using both the CPU and GPU backends:
