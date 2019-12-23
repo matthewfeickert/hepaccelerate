@@ -204,7 +204,7 @@ def apply_lepton_corrections(leptons, mask_leptons, lepton_weights):
     #multiply the per-lepton weights for each event
     all_events = NUMPY_LIB.ones(leptons.numevents(), dtype=NUMPY_LIB.bool)
     corr_per_event = backend_kernels.prod_in_offsets(
-       backend 
+        backend, 
         leptons.offsets, corrs, all_events, mask_leptons
     )
     
