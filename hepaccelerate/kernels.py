@@ -1,3 +1,5 @@
+#This file contains the public-facing kernels
+
 def spherical_to_cartesian(backend, pt, eta, phi, mass):
     return backend.spherical_to_cartesian(pt, eta, phi, mass)
 

@@ -140,7 +140,7 @@ def create_datastructure(ismc):
 def get_selected_muons(muons, pt_cut_leading, pt_cut_subleading, aeta_cut, iso_cut):
     this_worker = get_worker()
     NUMPY_LIB = this_worker.NUMPY_LIB
-    ha = this_worker.ha
+    backend = this_worker.backend
 
     passes_iso = muons.pfRelIso03_all > iso_cut
     passes_id = muons.tightId == True
@@ -159,7 +159,7 @@ def get_selected_muons(muons, pt_cut_leading, pt_cut_subleading, aeta_cut, iso_c
 
     #select events with at least 1 good muon
     evs_1mu = ha_kernels.sum_in_offsets(
-        this_worker.ha,
+        this_worker.backend,
         muons.offsets, selected_muons_leading, evs_all, muons.masks["all"]
     ) >= 1
     
@@ -168,7 +168,7 @@ def get_selected_muons(muons, pt_cut_leading, pt_cut_subleading, aeta_cut, iso_c
 def get_selected_electrons(electrons, pt_cut_leading, pt_cut_subleading, aeta_cut, iso_cut):
     this_worker = get_worker()
     NUMPY_LIB = this_worker.NUMPY_LIB
-    ha = this_worker.ha
+    backend = this_worker.backend
 
     passes_iso = electrons.pfRelIso03_all > iso_cut
     passes_id = electrons.pfId == True
@@ -187,7 +187,7 @@ def get_selected_electrons(electrons, pt_cut_leading, pt_cut_subleading, aeta_cu
     selected_electrons_leading = selected_electrons & passes_leading_pt
     
     ev_1el = ha_kernels.sum_in_offsets(
-        this_worker.ha,
+        this_worker.backend,
         electrons.offsets, selected_electrons_leading, evs_all, electrons.masks["all"]
     ) >= 1
         
@@ -196,15 +196,15 @@ def get_selected_electrons(electrons, pt_cut_leading, pt_cut_subleading, aeta_cu
 def apply_lepton_corrections(leptons, mask_leptons, lepton_weights):
     this_worker = get_worker()
     NUMPY_LIB = this_worker.NUMPY_LIB
-    ha = this_worker.ha
+    backend = this_worker.backend
     
     corrs = NUMPY_LIB.zeros_like(leptons.pt)
-    ha_kernels.get_bin_contents(ha, leptons.pt, lepton_weights[:, 0], lepton_weights[:-1, 1], corrs)
+    ha_kernels.get_bin_contents(backend, leptons.pt, lepton_weights[:, 0], lepton_weights[:-1, 1], corrs)
     
     #multiply the per-lepton weights for each event
     all_events = NUMPY_LIB.ones(leptons.numevents(), dtype=NUMPY_LIB.bool)
-    corr_per_event = ha_kernels.prod_in_offsets(
-        ha
+    corr_per_event = backend_kernels.prod_in_offsets(
+       backend 
         leptons.offsets, corrs, all_events, mask_leptons
     )
     
@@ -213,16 +213,16 @@ def apply_lepton_corrections(leptons, mask_leptons, lepton_weights):
 def apply_jec(jets_pt_orig, bins, jecs):
     this_worker = get_worker()
     NUMPY_LIB = this_worker.NUMPY_LIB
-    ha = this_worker.ha
+    backen = this_worker.backend
 
     corrs = NUMPY_LIB.zeros_like(jets_pt_orig)
-    ha_kernels.get_bin_contents(ha, jets_pt_orig, bins, jecs, corrs)
+    ha_kernels.get_bin_contents(backend, jets_pt_orig, bins, jecs, corrs)
     return 1.0 + corrs
 
 def select_jets(jets, mu, el, selected_muons, selected_electrons, pt_cut, aeta_cut, jet_lepton_dr_cut, btag_cut):
     this_worker = get_worker()
     NUMPY_LIB = this_worker.NUMPY_LIB
-    ha = this_worker.ha
+    backend = this_worker.backend
 
     passes_id = jets.puId == True
     passes_aeta = NUMPY_LIB.abs(jets.eta) < aeta_cut
@@ -233,7 +233,7 @@ def select_jets(jets, mu, el, selected_muons, selected_electrons, pt_cut, aeta_c
 
     jets_d = {"eta": jets.eta, "phi": jets.phi, "offsets": jets.offsets} 
     jets_pass_dr_mu = ha_kernels.mask_deltar_first(
-        ha,
+        backend,
         jets_d,
         selected_jets,
         {"eta": mu.eta, "phi": mu.phi, "offsets": mu.offsets},
@@ -253,7 +253,7 @@ def select_jets(jets, mu, el, selected_muons, selected_electrons, pt_cut, aeta_c
 def fill_histograms_several(hists, systematic_name, histname_prefix, variables, mask, weights, use_cuda):
     this_worker = get_worker()
     NUMPY_LIB = this_worker.NUMPY_LIB
-    ha = this_worker.ha
+    backend = this_worker.backend
 
     all_arrays = []
     all_bins = []
@@ -280,7 +280,7 @@ def fill_histograms_several(hists, systematic_name, histname_prefix, variables, 
             out_w = NUMPY_LIB.zeros((len(variables), nblocks, max_bins), dtype=NUMPY_LIB.float32)
             out_w2 = NUMPY_LIB.zeros((len(variables), nblocks, max_bins), dtype=NUMPY_LIB.float32)
             ha_kernels.fill_histogram_several[nblocks, 1024](
-                ha,
+                backend,
                 stacked_array, weight_array, mask, stacked_bins,
                 NUMPY_LIB.array(nbins), NUMPY_LIB.array(nbins_sum), out_w, out_w2
             )
@@ -295,7 +295,7 @@ def fill_histograms_several(hists, systematic_name, histname_prefix, variables, 
             out_w = NUMPY_LIB.zeros((len(variables), max_bins), dtype=NUMPY_LIB.float32)
             out_w2 = NUMPY_LIB.zeros((len(variables), max_bins), dtype=NUMPY_LIB.float32)
             ha_kernels.fill_histogram_several(
-                ha,
+                backend,
                 stacked_array, weight_array, mask, stacked_bins,
                 nbins, nbins_sum, out_w, out_w2
             )
@@ -329,7 +329,7 @@ def run_analysis(dataset, out, dnnmodel, use_cuda, ismc):
     from keras.backend.tensorflow_backend import set_session
     this_worker = get_worker()
     NUMPY_LIB = this_worker.NUMPY_LIB
-    ha = this_worker.ha
+    backend = this_worker.backend
     hists = {}
     histo_bins = {
         "nmu": np.array([0,1,2,3], dtype=np.float32),
@@ -359,9 +359,9 @@ def run_analysis(dataset, out, dnnmodel, use_cuda, ismc):
     jets = dataset.structs["Jet"][i]
     evvars = dataset.eventvars[i]
 
-    mu.hepaccelerate_backend = ha
-    el.hepaccelerate_backend = ha
-    jets.hepaccelerate_backend = ha
+    mu.hepaccelerate_backend = backend
+    el.hepaccelerate_backend = backend 
+    jets.hepaccelerate_backend = backend 
     
     evs_all = NUMPY_LIB.ones(dataset.numevents(), dtype=NUMPY_LIB.bool)
 
@@ -373,11 +373,11 @@ def run_analysis(dataset, out, dnnmodel, use_cuda, ismc):
     el.masks["selected"] = sel_el
     
     nmu = ha_kernels.sum_in_offsets(
-        ha,
+        backend,
         mu.offsets, mu.masks["selected"], evs_all, mu.masks["all"], dtype=NUMPY_LIB.int32
     )
     nel = ha_kernels.sum_in_offsets(
-        ha,
+        backend,
         el.offsets, el.masks["selected"], evs_all, el.masks["all"], dtype=NUMPY_LIB.int32
     )
         
@@ -395,7 +395,7 @@ def run_analysis(dataset, out, dnnmodel, use_cuda, ismc):
     weights_jet = {}
     for k in weights.keys():
         weights_jet[k] = NUMPY_LIB.zeros_like(jets.pt)
-        ha_kernels.broadcast(ha, jets.offsets, weights["nominal"], weights_jet[k])
+        ha_kernels.broadcast(backend, jets.offsets, weights["nominal"], weights_jet[k])
 
     all_jecs = [("nominal", "", None)]
     if ismc:
@@ -444,11 +444,11 @@ def run_analysis(dataset, out, dnnmodel, use_cuda, ismc):
         
         #compute the number of jets per event 
         njet = ha_kernels.sum_in_offsets(
-            ha,
+            backend,
             jets.offsets, sel_jet, evs_all, jets.masks["all"], dtype=NUMPY_LIB.int32
         )
         nbjet = ha_kernels.sum_in_offsets(
-            ha,
+            backend,
             jets.offsets, sel_bjet, evs_all, jets.masks["all"], dtype=NUMPY_LIB.int32
         )
 
@@ -485,14 +485,14 @@ def run_analysis(dataset, out, dnnmodel, use_cuda, ismc):
         inds = NUMPY_LIB.zeros_like(evs_all, dtype=NUMPY_LIB.int32) 
         targets = NUMPY_LIB.ones_like(evs_all, dtype=NUMPY_LIB.int32) 
         inds[:] = 0
-        ha_kernels.set_in_offsets(ha, jets.offsets, first_two_jets, inds, targets, selected_events, sel_jet)
+        ha_kernels.set_in_offsets(backend, jets.offsets, first_two_jets, inds, targets, selected_events, sel_jet)
         inds[:] = 1
-        ha_kernels.set_in_offsets(ha, jets.offsets, first_two_jets, inds, targets, selected_events, sel_jet)
+        ha_kernels.set_in_offsets(backend, jets.offsets, first_two_jets, inds, targets, selected_events, sel_jet)
 
         #compute the invariant mass of the first two jets
         dijet_inv_mass, dijet_pt = compute_inv_mass(jets, selected_events, sel_jet & first_two_jets, use_cuda)
 
-        sumpt_jets = ha_kernels.sum_in_offsets(ha, jets.offsets, jets.pt, selected_events, sel_jet)
+        sumpt_jets = ha_kernels.sum_in_offsets(backend, jets.offsets, jets.pt, selected_events, sel_jet)
 
         #create a keras-like array
         arr = NUMPY_LIB.vstack([
@@ -637,7 +637,7 @@ def load_dataset(datapath, filenames, ismc, nthreads, do_skim, NUMPY_LIB, ha, en
 
 def compute_inv_mass(objects, mask_events, mask_objects, use_cuda):
     this_worker = get_worker()
-    NUMPY_LIB, ha = this_worker.NUMPY_LIB, this_worker.ha 
+    NUMPY_LIB, backend = this_worker.NUMPY_LIB, this_worker.backend 
 
     inv_mass = NUMPY_LIB.zeros(len(mask_events), dtype=np.float32)
     pt_total = NUMPY_LIB.zeros(len(mask_events), dtype=np.float32)
@@ -776,10 +776,10 @@ def multiprocessing_initializer(args, gpu_id=None):
     this_worker.session = tf.Session(config=config)
     set_session(this_worker.session)
     
-    NUMPY_LIB, ha = hepaccelerate.choose_backend(args.use_cuda)
+    NUMPY_LIB, backend = hepaccelerate.choose_backend(args.use_cuda)
     this_worker.dnnmodel = DNNModel(NUMPY_LIB)
     this_worker.NUMPY_LIB = NUMPY_LIB
-    this_worker.ha = ha
+    this_worker.backend = backend 
     if args.use_cuda:
         import cuda_kernels as kernels
     else:
@@ -805,10 +805,10 @@ def multiprocessing_initializer(args, gpu_id=None):
 def load_and_analyze(args_tuple):
     fn, args, dataset, entrystart, entrystop, ismc, ichunk = args_tuple
     this_worker = get_worker()
-    NUMPY_LIB, ha = hepaccelerate.choose_backend(args.use_cuda)
+    NUMPY_LIB, backend = hepaccelerate.choose_backend(args.use_cuda)
     
     print("Loading {0}".format(fn))
-    ds, timing_results = load_dataset(args.datapath, fn, ismc, args.nthreads, args.skim, NUMPY_LIB, ha, entrystart, entrystop)
+    ds, timing_results = load_dataset(args.datapath, fn, ismc, args.nthreads, args.skim, NUMPY_LIB, backend, entrystart, entrystop)
     t0 = time.time()
     ret = run_analysis(ds, "{0}_{1}".format(dataset, ichunk), this_worker.dnnmodel, args.use_cuda, ismc)
     t1 = time.time()
