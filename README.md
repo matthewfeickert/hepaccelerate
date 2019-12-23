@@ -160,6 +160,93 @@ ev_weight = dataset.eventvars[ifile]["EventWeight"]
 print(ev_weight)
 ```
 
+The kernels can be used as follows:
+```python
+import numpy
+import uproot
+
+from hepaccelerate import backend_cpu as ha
+
+tt = uproot.open("data/HZZ.root").get("events")
+
+mu_px = tt.array("Muon_Px")
+offsets = mu_px.offsets
+pxs = mu_px.content
+
+sel_ev = numpy.ones(len(tt), dtype=numpy.bool)
+sel_mu = numpy.ones(len(pxs), dtype=numpy.bool)
+
+#This is the same functionality as awkward.array.max, but supports either CPU or GPU!
+#Note that events with no entries will be filled with zeros rather than skipped
+event_max_px = ha.max_in_offsets(
+    offsets,
+    pxs,
+    sel_ev,
+    sel_mu)
+
+event_max_px_awkward = mu_px.max()
+event_max_px_awkward[numpy.isinf(event_max_px_awkward)] = 0
+
+print(numpy.all(event_max_px_awkward == event_max_px))
+```
+
+### Dataset utilities
+
+  - `Dataset(name, filenames, datastructures, datapath="", treename="Events", is_mc=True)`: represents a dataset of many jagged arrays from multiple files with the same structure in memory
+    - `load_root()`: Load the dataset from ROOT files to memory
+    - `structs[name][ifile]`: JaggedStruct `name` in file `ifile`
+    - `compact(masks)`: Drop events that do not pass the masks, one per file
+  - `JaggedStruct`: Container for multiple singly-nested jagged arrays with the same offsets
+    - `getattr(name)`: get the content array corresponding to an attribute (e.g. `jet.pt`)
+    - `offsets`: get the offsets array
+    - `move_to_device(array_lib)`: with `array_lib` being either `numpy` or `cupy`
+  - `Histogram(contents, contents_w2, edges)`: a very simple container for a one-dimensional histogram
+
+The following example illustrates how the dataset structures are used:
+```python
+from hepaccelerate.utils import Dataset
+
+#Define which columns we want to access
+datastructures = {
+    "Muon": [
+        ("Muon_Px", "float32"),
+        ("Muon_Py", "float32"),
+    ],
+    "Jet": [
+        ("Jet_E", "float32"),
+        ("Jet_btag", "float32"),
+    ],
+    "EventVariables": [
+        ("NPrimaryVertices", "int32"),
+        ("triggerIsoMu24", "bool"),
+        ("EventWeight", "float32")
+    ]
+}
+
+#Define the dataset across the files
+dataset = Dataset("HZZ", ["data/HZZ.root"], datastructures, treename="events", datapath="")
+
+#Load the data to memory
+dataset.load_root()
+
+#Jets in the first file
+ifile = 0
+jets = dataset.structs["Jet"][ifile]
+
+#common offset array for jets
+jets_offsets = jets.offsets
+print(jets_offsets)
+
+#data arrays
+jets_energy = jets.E
+jets_btag = jets.btag
+print(jets_energy)
+print(jets_btag)
+
+ev_weight = dataset.eventvars[ifile]["EventWeight"]
+print(ev_weight)
+```
+
 ## Usage
 
 A minimal example can be found in [examples/simple_hzz.py](../blob/master/examples/simple_hzz.py), which can be run from this repository directly using
