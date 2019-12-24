@@ -7,10 +7,10 @@
 - Fast kernels for HEP data analysis with [jagged arrays](https://github.com/scikit-hep/awkward-array) using python + [Numba](http://numba.pydata.org/)
 - Use **any ntuple**, as long as you can open it with [uproot](https://github.com/scikit-hep/uproot)
 - analyze a billion events with systematic to histograms in minutes on a single workstation
-  - 1e9 events / (50 kHz x 24 threads) ~ 13 minutes
+  - 1e9 events / (50 kHz x 24 CPU threads) ~ 13 minutes
 - weighted histograms, deltaR matching and [more](https://github.com/hepaccelerate/hepaccelerate#kernels)
 - use a CPU or an nVidia CUDA GPU with the same interface!
-- this is **not** an analysis framework, but rather a small set of helpers for fast jagged array processing
+- this is **not** an analysis framework, but rather a set of helper functions for fast jagged array processing
 
 **Under active development and use by a few CMS analyses!**
 
@@ -42,9 +42,9 @@ Optional libraries, which may be easier to install with conda:
 ## Documentation
 This code consists of two parts which can be used independently:
   - the accelerated HEP kernels that run on jagged data: [kernels.py](https://github.com/hepaccelerate/hepaccelerate/blob/master/hepaccelerate/kernels.py)
-    - CPU backend
-    - CUDA backend
-  - JaggedStruct, Dataset and Histogram classes to help with HEP dataset management
+    - CPU backend, [backend_cpu.py](https://github.com/hepaccelerate/hepaccelerate/blob/master/hepaccelerate/backend_cpu.py)
+    - CUDA backend, [backend_cuda.py](https://github.com/hepaccelerate/hepaccelerate/blob/master/hepaccelerate/backend_cuda.py)
+  - JaggedStruct, Dataset and Histogram classes to help with HEP dataset management, [utils.py](https://github.com/hepaccelerate/hepaccelerate/blob/master/hepaccelerate/utils.py)
 
 ### Environment variables
 
@@ -56,21 +56,21 @@ NUMBA_NUM_THREADS=1 #number of parallel threads for numba CPU kernels
 
 ### Kernels
 
-The jagged kernels work on the basis of the `content` and `offsets` arrays based on `awkward.JaggedArray` and can be used on any `numpy` or `cupy` data arrays.
+The jagged kernels work on the basis of the `content` and `offsets` arrays based on `awkward.JaggedArray` and can be used on `numpy` or `cupy` data arrays. The full list of kernels is available in [kernels.py](https://github.com/hepaccelerate/hepaccelerate/blob/master/hepaccelerate/kernels.py).
 
 We have implemented the following kernels for both the CPU and CUDA backends:
-  - `kernels.min_in_offsets(backend, offsets, content, mask_rows, mask_content)`: retrieve the minimum value in a jagged array, given row and object masks
-  - `kernels.max_in_offsets(backend, offsets, content, mask_rows, mask_content)`: as above, but find the maximum
-  - `kernels.prod_in_offsets(backend, offsets, content, mask_rows, mask_content)`: compute the product in a jagged array
-  - `kernels.set_in_offsets(backend, content, offsets, indices, target, mask_rows, mask_content)`: set the indexed value in a jagged array to a target
-  - `kernels.get_in_offsets(backend, offsets, content, indices, mask_rows, mask_content)`:   retrieve the indexed values in a jagged array, e.g. get the leading jet pT
-  - `kernels.compute_new_offsets(backend, offsets_old, mask_objects, offsets_new)`: given an   awkward offset array and a mask, create an offset array of the unmasked elements
-  - `kernels.searchsorted(backend, bins, vals, side="left")`: 1-dimensional search in a sorted array
-  - `kernels.histogram_from_vector(backend, data, weights, bins, mask=None)`: fill a 1-dimensional weighted histogram with arbitrary sorted bins, possibly using a mask
-  - `kernels.histogram_from_vector_several(backend, variables, weights, mask)`: fill several histograms simultaneously based on `variables=[(data0, bins0), ...]`, this is more efficient on GPUs than many small kernel calls
-  - `kernels.get_bin_contents(backend, values, edges, contents, out)`: look up the bin contents of a histogram based on a vector of values 
-  - `kernels.select_opposite_sign(backend, muons, in_mask)`: select the first pair with opposite sign charge
-  - `kernels.mask_deltar_first(backend, objs1, mask1, objs2, mask2, drcut)`: given two collections of objects defined by eta, phi and offsets, mask the objects in the first collection that satisfy `DeltaR(o1, o2) < drcut)`
+  - `min_in_offsets`: retrieve the minimum value in a jagged array, given row and object masks
+  - `max_in_offsets`: as above, but find the maximum
+  - `prod_in_offsets`: compute the product in a jagged array
+  - `set_in_offsets`: set the indexed value in a jagged array to a target
+  - `get_in_offsets`:   retrieve the indexed values in a jagged array, e.g. get the leading jet pT
+  - `compute_new_offsets`: given an awkward offset array and a mask, create an offset array of the unmasked elements
+  - `searchsorted`: 1-dimensional search in a sorted array
+  - `histogram_from_vector`: fill a 1-dimensional weighted histogram with arbitrary sorted bins, possibly using a mask
+  - `histogram_from_vector_several`: fill several histograms simultaneously based on `variables=[(data0, bins0), ...]`, this is more efficient on GPUs than many small kernel calls
+  - `get_bin_contents`: look up the bin contents of a histogram based on a vector of values 
+  - `select_opposite_sign`: select the first pair with opposite sign charge
+  - `mask_deltar_first`: given two collections of objects defined by eta, phi and offsets, mask the objects in the first collection that satisfy `DeltaR(o1, o2) < drcut)`
 
 The kernels can be used as follows:
 ```python
