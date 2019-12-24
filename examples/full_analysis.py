@@ -15,7 +15,7 @@ from numba import cuda
 import numpy as np
 
 import dask
-from dask.distributed import Client, LocalCluster
+from dask.distributed import Client
 from distributed import get_worker
 
 use_cuda = bool(int(os.environ.get("HEPACCELERATE_CUDA", 0)))
@@ -645,85 +645,15 @@ def compute_inv_mass(objects, mask_events, mask_objects, use_cuda):
     inv_mass = NUMPY_LIB.zeros(len(mask_events), dtype=np.float32)
     pt_total = NUMPY_LIB.zeros(len(mask_events), dtype=np.float32)
     if use_cuda:
-        compute_inv_mass_cudakernel[32, 1024](
+        this_worker.kernels.compute_inv_mass_cudakernel[32, 1024](
             objects.offsets, objects.pt, objects.eta, objects.phi, objects.mass,
             mask_events, mask_objects, inv_mass, pt_total)
         cuda.synchronize()
     else:
-        compute_inv_mass_kernel(objects.offsets,
+        this_worker.kernels.compute_inv_mass_kernel(objects.offsets,
             objects.pt, objects.eta, objects.phi, objects.mass,
             mask_events, mask_objects, inv_mass, pt_total)
     return inv_mass, pt_total
-
-@numba.njit(parallel=True, fastmath=True)
-def compute_inv_mass_kernel(offsets, pts, etas, phis, masses, mask_events, mask_objects, out_inv_mass, out_pt_total):
-    for iev in numba.prange(offsets.shape[0]-1):
-        if mask_events[iev]:
-            start = np.uint64(offsets[iev])
-            end = np.uint64(offsets[iev + 1])
-            
-            px_total = np.float32(0.0)
-            py_total = np.float32(0.0)
-            pz_total = np.float32(0.0)
-            e_total = np.float32(0.0)
-            
-            for iobj in range(start, end):
-                if mask_objects[iobj]:
-                    pt = pts[iobj]
-                    eta = etas[iobj]
-                    phi = phis[iobj]
-                    mass = masses[iobj]
-
-                    px = pt * np.cos(phi)
-                    py = pt * np.sin(phi)
-                    pz = pt * np.sinh(eta)
-                    e = np.sqrt(px**2 + py**2 + pz**2 + mass**2)
-                    
-                    px_total += px 
-                    py_total += py 
-                    pz_total += pz 
-                    e_total += e
-
-            inv_mass = np.sqrt(-(px_total**2 + py_total**2 + pz_total**2 - e_total**2))
-            pt_total = np.sqrt(px_total**2 + py_total**2)
-            out_inv_mass[iev] = inv_mass
-            out_pt_total[iev] = pt_total
-
-@cuda.jit
-def compute_inv_mass_cudakernel(offsets, pts, etas, phis, masses, mask_events, mask_objects, out_inv_mass, out_pt_total):
-    xi = cuda.grid(1)
-    xstride = cuda.gridsize(1)
-    for iev in range(xi, offsets.shape[0]-1, xstride):
-        if mask_events[iev]:
-            start = np.uint64(offsets[iev])
-            end = np.uint64(offsets[iev + 1])
-            
-            px_total = np.float32(0.0)
-            py_total = np.float32(0.0)
-            pz_total = np.float32(0.0)
-            e_total = np.float32(0.0)
-            
-            for iobj in range(start, end):
-                if mask_objects[iobj]:
-                    pt = pts[iobj]
-                    eta = etas[iobj]
-                    phi = phis[iobj]
-                    mass = masses[iobj]
-
-                    px = pt * math.cos(phi)
-                    py = pt * math.sin(phi)
-                    pz = pt * math.sinh(eta)
-                    e = math.sqrt(px**2 + py**2 + pz**2 + mass**2)
-                    
-                    px_total += px 
-                    py_total += py 
-                    pz_total += pz 
-                    e_total += e
-
-            inv_mass = math.sqrt(-(px_total**2 + py_total**2 + pz_total**2 - e_total**2))
-            pt_total = math.sqrt(px_total**2 + py_total**2)
-            out_inv_mass[iev] = inv_mass
-            out_pt_total[iev] = pt_total
 
 def chunks(l, n):
     """Yield successive n-sized chunks from l."""
@@ -757,12 +687,12 @@ def parse_args():
 
     return args
 
-
-#Placeholder for no-dask
+#Placeholder module for debugging without dask
 class Module:
     pass
 global_worker = Module()
 
+#Get either the dask worker or the global module
 def get_worker_wrapper():
     global global_worker
     try:
@@ -771,9 +701,11 @@ def get_worker_wrapper():
         this_worker = global_worker
     return this_worker
 
+#Initialize the worker: load tensorflow and kernels
 def multiprocessing_initializer(args, gpu_id=None):
     this_worker = get_worker_wrapper()
 
+    #Set up tensorflow
     import tensorflow as tf
     config = tf.compat.v1.ConfigProto()
     config.intra_op_parallelism_threads=args.nthreads
@@ -796,11 +728,14 @@ def multiprocessing_initializer(args, gpu_id=None):
     NUMPY_LIB, backend = hepaccelerate.choose_backend(args.use_cuda)
     this_worker.dnnmodel = DNNModel(NUMPY_LIB)
     this_worker.NUMPY_LIB = NUMPY_LIB
-    this_worker.backend = backend 
+    this_worker.backend = backend
+
+    #Import kernels that are specific to this analysis 
     if args.use_cuda:
         import cuda_kernels as kernels
     else:
         import cpu_kernels as kernels
+
     this_worker.kernels = kernels
     this_worker.graph = tf.get_default_graph()
 
