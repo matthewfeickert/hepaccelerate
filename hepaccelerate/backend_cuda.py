@@ -501,10 +501,11 @@ def sum_in_offsets(offsets, content, mask_rows=None, mask_content=None, dtype=No
     cuda.synchronize()
     return sum_offsets
 
-def prod_in_offsets(offsets, content, mask_rows, mask_content, dtype=None):
+def prod_in_offsets(offsets, content, mask_rows=None, mask_content=None, dtype=None):
     if not dtype:
         dtype = content.dtype
     ret = cupy.ones(len(offsets) - 1, dtype=dtype)
+    mask_rows, mask_content = make_masks(offsets, content, mask_rows, mask_content) 
     prod_in_offsets_cudakernel[32, 1024](offsets, content, mask_rows, mask_content, ret)
     cuda.synchronize()
     return ret
