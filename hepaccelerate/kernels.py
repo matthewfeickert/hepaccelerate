@@ -96,7 +96,7 @@ def prod_in_offsets(backend, offsets, content, mask_rows=None, mask_content=None
     >>> assert(numpy.all(r == numpy.array([2.0, 12.0, 42.0, 1.0])))
 
     Args:
-        backend (TYPE): Description
+        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
         offsets (TYPE): Description
         content (TYPE): Description
         mask_rows (TYPE): Description
@@ -118,7 +118,7 @@ def max_in_offsets(backend, offsets, content, mask_rows=None, mask_content=None)
     >>> assert(numpy.all(r == numpy.array([2.0, 4.0, 7.0, 0.0])))
 
     Args:
-        backend (TYPE): Description
+        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
         offsets (TYPE): Description
         content (TYPE): Description
         mask_rows (None, optional): Description
@@ -139,7 +139,7 @@ def min_in_offsets(backend, offsets, content, mask_rows=None, mask_content=None)
     >>> assert(numpy.all(r == numpy.array([1.0, 3.0, 6.0, 0.0])))
 
     Args:
-        backend (TYPE): Description
+        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
         offsets (TYPE): Description
         content (TYPE): Description
         mask_rows (None, optional): Description
@@ -154,7 +154,7 @@ def select_opposite_sign(backend, offsets, charges, in_mask):
     """Summary
     
     Args:
-        backend (TYPE): Description
+        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
         offsets (TYPE): Description
         charges (TYPE): Description
         in_mask (TYPE): Description
@@ -176,7 +176,7 @@ def get_in_offsets(backend, offsets, content, indices, mask_rows=None, mask_cont
     >>> assert(numpy.all(r == numpy.array([1.0, 4.0, 7.0, 0.0])))
 
     Args:
-        backend (TYPE): Description
+        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
         offsets (TYPE): Description
         content (TYPE): Description
         indices (TYPE): Description
@@ -201,106 +201,137 @@ def set_in_offsets(backend, offsets, content, indices, target, mask_rows=None, m
     >>> assert(numpy.all(r.content))
 
     Args:
-        backend (TYPE): Description
+        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
         offsets (TYPE): Description
         content (TYPE): Description
         indices (TYPE): Description
         target (TYPE): Description
         mask_rows (None, optional): Description
         mask_content (None, optional): Description
-    
-    Returns:
-        TYPE: Description
     """
     backend.set_in_offsets(offsets, content, indices, target, mask_rows=mask_rows, mask_content=mask_content)
  
 def mask_deltar_first(backend, objs1, mask1, objs2, mask2, drcut):
-    """Summary
-    
+    """Masks objects in the first collection that are closer than drcut to
+       objects in the second collection according to dR=sqrt(dEta^2 + dPhi^2) 
+
     Args:
-        backend (TYPE): Description
-        objs1 (TYPE): Description
-        mask1 (TYPE): Description
-        objs2 (TYPE): Description
-        mask2 (TYPE): Description
-        drcut (TYPE): Description
+        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
+        objs1 (dict): a dictionary containing the "eta" and "phi" arrays for the first collection
+        mask1 (array of bool): Mask of objects in the first collection that are not used for the matching
+        objs2 (TYPE): a dictionary containing the "eta" and "phi" arrays for the second collection
+        mask2 (array of bool): Mask of objects in the second collection that are not used for the matching
+        drcut (float): Minimum delta R value between objects
     
     Returns:
-        TYPE: Description
+        array of bool: Mask for objects in the first collection that are closer
+            than drcut to objects in the second collection
     """
     return backend.mask_deltar_first(objs1, mask1, objs2, mask2, drcut)
 
 def histogram_from_vector(backend, data, weights, bins, mask=None):
-    """Summary
-    
+    """Fills the weighted values in a data array to a histogram specified by a sorted one-dimensional bin array.
+
+    >>> data = numpy.array([1,1,1,2,3], dtype=numpy.float32)
+    >>> weights = numpy.array([1,1,1,2,1], dtype=numpy.float32)
+    >>> bins = numpy.array([0,1,2,3,4,5], dtype=numpy.float32)
+    >>> mask = numpy.array([False, True, True, True, True])
+    >>> r = histogram_from_vector(backend_cpu, data, weights, bins, mask=mask)
+    >>> assert(numpy.all(r[0] == numpy.array([0., 2., 2., 1., 0.])))
+    >>> assert(numpy.all(r[1] == numpy.array([0., 2., 4., 1., 0.])))
+    >>> assert(numpy.all(r[2] == bins))
+
     Args:
-        backend (TYPE): Description
-        data (TYPE): Description
-        weights (TYPE): Description
-        bins (TYPE): Description
-        mask (None, optional): Description
+        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
+        data (array of floats): Data array of samples to fill into the histogram
+        weights (array of floats): Per-sample weights
+        bins (array of floats): Sorted one dimensional bin array
+        mask (array of bool, optional): Sample mask to disable filling certain elements
     
     Returns:
-        TYPE: Description
+        tuple of arrays (w, w^2, bins): A tuple of weight, squared weight and bin arrays
     """
     return backend.histogram_from_vector(data, weights, bins, mask=mask)
  
 def histogram_from_vector_several(backend, variables, weights, mask):
-    """Summary
-    
+    """Fills several data arrays into histograms simultaneously. On a GPU, this is
+        faster than calling the histogram function several times due to the overhead
+        of calling simple kernels.
+
+    >>> variables = [(numpy.array([1,1,1,2,3], dtype=numpy.float32), numpy.array([0,1,2,3,4,5], dtype=numpy.float32))]
+    >>> weights = numpy.array([1,1,1,2,1], dtype=numpy.float32)
+    >>> mask = numpy.array([False, True, True, True, True])
+    >>> r = histogram_from_vector_several(backend_cpu, variables, weights, mask)
+    >>> assert(numpy.all(r[0][0] == numpy.array([0., 2., 2., 1., 0.])))
+    >>> assert(numpy.all(r[0][1] == numpy.array([0., 2., 4., 1., 0.])))
+    >>> assert(numpy.all(r[0][2] == variables[0][1]))
+
     Args:
-        backend (TYPE): Description
-        variables (TYPE): Description
-        weights (TYPE): Description
-        mask (TYPE): Description
+        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
+        variables (list of (data, bins) tuples): Pairs of sample data and bin arrays
+        weights (array of floats): Per-sample weight array
+        mask (array of bool): Per-sample mask to enable or disable samples
     
     Returns:
-        TYPE: Description
+        List of (w, w^2, bins) tuples: A list of tuples of weight, squared weight and bin arrays for each variable
     """
     return backend.histogram_from_vector_several(variables, weights, mask) 
 
 def get_bin_contents(backend, values, edges, contents, out):
-    """Summary
-    
+    """Does a lookup on the values given a set of sorted edges and contents forming a histogram.
+
+    >>> values = numpy.array([1,1,2,3])
+    >>> edges = numpy.array([1,2,3,4,5])
+    >>> contents = numpy.array([10,20,30,40])
+    >>> out = numpy.zeros_like(values)
+    >>> get_bin_contents(backend_cpu, values, edges, contents, out)
+    >>> assert(numpy.all(out == numpy.array([20, 20, 30, 40])))
+
     Args:
-        backend (TYPE): Description
+        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
         values (TYPE): Description
         edges (TYPE): Description
         contents (TYPE): Description
         out (TYPE): Description
-    
-    Returns:
-        TYPE: Description
     """
-    return backend.get_bin_contents(values, edges, contents, out) 
+    backend.get_bin_contents(values, edges, contents, out) 
 
 def copyto_dst_indices(backend, dst, src, inds_dst):
-    """Summary
-    
+    """Copies the values from the src array to the specified indices in the dst array
+
+    >>> src = numpy.array([1,2,3])
+    >>> dst = numpy.array([0,0,0])
+    >>> inds = numpy.array([2,1,0])
+    >>> copyto_dst_indices(backend_cpu, dst, src, inds)
+    >>> assert(numpy.all([3,2,1]))
+
     Args:
-        backend (TYPE): Description
+        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
         dst (TYPE): Description
         src (TYPE): Description
         inds_dst (TYPE): Description
-    
-    Returns:
-        TYPE: Description
     """
-    return backend.copyto_dst_indices(dst, src, inds_dst) 
+    backend.copyto_dst_indices(dst, src, inds_dst) 
 
 def compute_new_offsets(backend, offsets_old, mask_objects, offsets_new):
-    """Summary
-    
+    """Masks elements in a jagged array, creating a new offset array
+
+    >>> j = awkward.fromiter([[1.0, 2.0],[3.0, 4.0, 5.0]])
+    >>> mask = numpy.array([True, False, True, False, True])
+    >>> o = numpy.zeros_like(j.offsets)
+    >>> compute_new_offsets(backend_cpu, j.offsets, mask, o)
+    >>> j2 = awkward.JaggedArray.fromoffsets(o, j.content[mask])
+    >>> j3 = awkward.fromiter([[1.0],[3.0, 5.0]])
+    >>> assert(numpy.all(j2.content == j3.content))
+    >>> assert(numpy.all(j2.offsets == j3.offsets))
+
     Args:
-        backend (TYPE): Description
+        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
         offsets_old (TYPE): Description
         mask_objects (TYPE): Description
         offsets_new (TYPE): Description
-    
-    Returns:
-        TYPE: Description
     """
-    return backend.compute_new_offsets(offsets_old, mask_objects, offsets_new)
+    backend.compute_new_offsets(offsets_old, mask_objects, offsets_new)
 
 if __name__ == "__main__":
     import doctest
