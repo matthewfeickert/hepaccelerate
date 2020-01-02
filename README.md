@@ -10,7 +10,7 @@
   - 1e9 events / (50 kHz x 24 CPU threads) ~ 13 minutes
 - weighted histograms, deltaR matching and [more](https://github.com/hepaccelerate/hepaccelerate#kernels)
 - use a CPU or an nVidia CUDA GPU with the same interface!
-- this is **not** an analysis framework, but rather a set of helper functions for fast jagged array processing
+- this is **not** an analysis framework, but rather a set of example helper functions for fast jagged array processing
 
 **Under active development and use by a few CMS analyses!**
 
@@ -59,18 +59,19 @@ NUMBA_NUM_THREADS=1 #number of parallel threads for numba CPU kernels
 The jagged kernels work on the basis of the `content` and `offsets` arrays based on `awkward.JaggedArray` and can be used on `numpy` or `cupy` data arrays. The full list of kernels is available in [kernels.py](https://github.com/hepaccelerate/hepaccelerate/blob/master/hepaccelerate/kernels.py).
 
 We have implemented the following kernels for both the CPU and CUDA backends:
-  - `min_in_offsets`: retrieve the minimum value in a jagged array, given row and object masks
-  - `max_in_offsets`: as above, but find the maximum
-  - `prod_in_offsets`: compute the product in a jagged array
-  - `set_in_offsets`: set the indexed value in a jagged array to a target
-  - `get_in_offsets`:   retrieve the indexed values in a jagged array, e.g. get the leading jet pT
-  - `compute_new_offsets`: given an awkward offset array and a mask, create an offset array of the unmasked elements
-  - `searchsorted`: 1-dimensional search in a sorted array
-  - `histogram_from_vector`: fill a 1-dimensional weighted histogram with arbitrary sorted bins, possibly using a mask
-  - `histogram_from_vector_several`: fill several histograms simultaneously based on `variables=[(data0, bins0), ...]`, this is more efficient on GPUs than many small kernel calls
-  - `get_bin_contents`: look up the bin contents of a histogram based on a vector of values 
+  - `searchsorted`: 1-dimensional search in a sorted array as `np.searchsorted`
+  - `histogram_from_vector`: fill a 1-dimensional weighted histogram
+  - `histogram_from_vector_several`: fill several 1-dimensional histograms simultaneously
+  - `get_bin_contents`: look up the bin contents of a histogram based on a vector of values
+  - `compute_new_offsets`: given an offset array and a mask, create an offset array of the unmasked elements
   - `select_opposite_sign`: select the first pair with opposite sign charge
   - `mask_deltar_first`: given two collections of objects defined by eta, phi and offsets, mask the objects in the first collection that satisfy `DeltaR(o1, o2) < drcut)`
+  - `min_in_offsets`: retrieve the minimum value in a jagged array
+  - `max_in_offsets`: as above, but find the maximum
+  - `prod_in_offsets`: compute the product in a jagged array
+  - `sum_in_offsets`: compute the sum in a jagged array
+  - `set_in_offsets`: set the indexed value in a jagged array to a target value
+  - `get_in_offsets`:   retrieve the indexed values in a jagged array
 
 The kernels can be used as follows:
 ```python
