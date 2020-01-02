@@ -397,8 +397,8 @@ def apply_run_lumi_mask_kernel(masks, runs, lumis, mask_out):
 
 @numba.njit(parallel=True, fastmath=True)
 def compute_new_offsets(offsets_old, mask_objects, offsets_new):
-    counts = np.zeros(len(offsets_old)-1, dtype=np.int64)
-    for iev in numba.prange(len(offsets_old)-1):
+    counts = np.zeros(len(offsets_old) - 1, dtype=np.int64)
+    for iev in numba.prange(len(offsets_old) - 1):
         start = offsets_old[iev]
         end = offsets_old[iev + 1]
         ret = 0
@@ -406,6 +406,7 @@ def compute_new_offsets(offsets_old, mask_objects, offsets_new):
             if mask_objects[ielem]:
                 ret += 1
             counts[iev] = ret
+
     count_tot = 0
     for iev in range(len(counts)):
         offsets_new[iev] = count_tot
