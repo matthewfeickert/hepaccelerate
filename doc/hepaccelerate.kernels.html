@@ -1,0 +1,285 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: module hepaccelerate.kernels</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head><body bgcolor="#f0f0f8">
+
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
+<tr bgcolor="#7799ee">
+<td valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong><a href="hepaccelerate.html"><font color="#ffffff">hepaccelerate</font></a>.kernels</strong></big></big></font></td
+><td align=right valign=bottom
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:/Users/joosep/Documents/caltech/hepaccelerate/hepaccelerate/hepaccelerate/kernels.py">/Users/joosep/Documents/caltech/hepaccelerate/hepaccelerate/hepaccelerate/kernels.py</a></font></td></tr></table>
+    <p><tt>This&nbsp;file&nbsp;contains&nbsp;the&nbsp;public-facing&nbsp;API&nbsp;of&nbsp;the&nbsp;kernels</tt></p>
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#eeaa77">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Functions</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#eeaa77"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt><a name="-broadcast"><strong>broadcast</strong></a>(backend, offsets, content, out)</dt><dd><tt>Given&nbsp;the&nbsp;offsets&nbsp;from&nbsp;a&nbsp;one-dimensional&nbsp;jagged&nbsp;array,&nbsp;broadcasts&nbsp;a&nbsp;per-event&nbsp;array&nbsp;to&nbsp;a&nbsp;per-object&nbsp;array.<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;j&nbsp;=&nbsp;awkward.fromiter([[1.0,&nbsp;2.0],[3.0,&nbsp;4.0,&nbsp;5.0]])<br>
+&gt;&gt;&gt;&nbsp;inp&nbsp;=&nbsp;numpy.array([123.0,&nbsp;456.0])<br>
+&gt;&gt;&gt;&nbsp;out&nbsp;=&nbsp;numpy.zeros_like(j.content)<br>
+&gt;&gt;&gt;&nbsp;<a href="#-broadcast">broadcast</a>(backend_cpu,&nbsp;j.offsets,&nbsp;inp,&nbsp;out)<br>
+&gt;&gt;&gt;&nbsp;j2&nbsp;=&nbsp;awkward.JaggedArray.fromoffsets(j.offsets,&nbsp;out)<br>
+&gt;&gt;&gt;&nbsp;r&nbsp;=&nbsp;(j2&nbsp;==&nbsp;awkward.fromiter([[123.0,&nbsp;123.0],[456.0,&nbsp;456.0,&nbsp;456.0]]))<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(r.content))<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;offsets&nbsp;(array&nbsp;of&nbsp;uint64):&nbsp;one&nbsp;dimensional&nbsp;offsets&nbsp;of&nbsp;the&nbsp;jagged&nbsp;array&nbsp;(depth&nbsp;1)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;per-event&nbsp;array&nbsp;of&nbsp;inputs&nbsp;to&nbsp;broadcast<br>
+&nbsp;&nbsp;&nbsp;&nbsp;out&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;per-element&nbsp;output</tt></dd></dl>
+ <dl><dt><a name="-cartesian_to_spherical"><strong>cartesian_to_spherical</strong></a>(backend, px, py, pz, e)</dt><dd><tt>Converts&nbsp;an&nbsp;array&nbsp;of&nbsp;cartesian&nbsp;four-momentum&nbsp;coordinates&nbsp;(px,&nbsp;py&nbsp;,pz,&nbsp;E)&nbsp;to&nbsp;spherical&nbsp;(pt,&nbsp;eta,&nbsp;phi,&nbsp;mass).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;px&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;Data&nbsp;array&nbsp;of&nbsp;the&nbsp;momentum&nbsp;x&nbsp;coordinate&nbsp;(numpy&nbsp;or&nbsp;cupy)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;py&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;Data&nbsp;array&nbsp;of&nbsp;the&nbsp;momentum&nbsp;y&nbsp;coordinate<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pz&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;Data&nbsp;array&nbsp;of&nbsp;the&nbsp;momentum&nbsp;z&nbsp;coordinate<br>
+&nbsp;&nbsp;&nbsp;&nbsp;e&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;Data&nbsp;array&nbsp;of&nbsp;the&nbsp;energy&nbsp;values<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tuple&nbsp;of&nbsp;arrays:&nbsp;returns&nbsp;the&nbsp;numpy&nbsp;or&nbsp;cupy&nbsp;arrays&nbsp;(pt,&nbsp;eta,&nbsp;phi,&nbsp;mass)</tt></dd></dl>
+ <dl><dt><a name="-compute_new_offsets"><strong>compute_new_offsets</strong></a>(backend, offsets_old, mask_objects, offsets_new)</dt><dd><tt>Masks&nbsp;elements&nbsp;in&nbsp;a&nbsp;jagged&nbsp;array,&nbsp;creating&nbsp;a&nbsp;new&nbsp;offset&nbsp;array<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;j&nbsp;=&nbsp;awkward.fromiter([[1.0,&nbsp;2.0],[3.0,&nbsp;4.0,&nbsp;5.0]])<br>
+&gt;&gt;&gt;&nbsp;mask&nbsp;=&nbsp;numpy.array([True,&nbsp;False,&nbsp;True,&nbsp;False,&nbsp;True])<br>
+&gt;&gt;&gt;&nbsp;o&nbsp;=&nbsp;numpy.zeros_like(j.offsets)<br>
+&gt;&gt;&gt;&nbsp;<a href="#-compute_new_offsets">compute_new_offsets</a>(backend_cpu,&nbsp;j.offsets,&nbsp;mask,&nbsp;o)<br>
+&gt;&gt;&gt;&nbsp;j2&nbsp;=&nbsp;awkward.JaggedArray.fromoffsets(o,&nbsp;j.content[mask])<br>
+&gt;&gt;&gt;&nbsp;j3&nbsp;=&nbsp;awkward.fromiter([[1.0],[3.0,&nbsp;5.0]])<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(j2.content&nbsp;==&nbsp;j3.content))<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(j2.offsets&nbsp;==&nbsp;j3.offsets))<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;offsets_old&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask_objects&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;offsets_new&nbsp;(TYPE):&nbsp;Description</tt></dd></dl>
+ <dl><dt><a name="-copyto_dst_indices"><strong>copyto_dst_indices</strong></a>(backend, dst, src, inds_dst)</dt><dd><tt>Copies&nbsp;the&nbsp;values&nbsp;from&nbsp;the&nbsp;src&nbsp;array&nbsp;to&nbsp;the&nbsp;specified&nbsp;indices&nbsp;in&nbsp;the&nbsp;dst&nbsp;array<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;src&nbsp;=&nbsp;numpy.array([1,2,3])<br>
+&gt;&gt;&gt;&nbsp;dst&nbsp;=&nbsp;numpy.array([0,0,0])<br>
+&gt;&gt;&gt;&nbsp;inds&nbsp;=&nbsp;numpy.array([2,1,0])<br>
+&gt;&gt;&gt;&nbsp;<a href="#-copyto_dst_indices">copyto_dst_indices</a>(backend_cpu,&nbsp;dst,&nbsp;src,&nbsp;inds)<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all([3,2,1]))<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dst&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;src&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;inds_dst&nbsp;(TYPE):&nbsp;Description</tt></dd></dl>
+ <dl><dt><a name="-get_bin_contents"><strong>get_bin_contents</strong></a>(backend, values, edges, contents, out)</dt><dd><tt>Does&nbsp;a&nbsp;lookup&nbsp;on&nbsp;the&nbsp;values&nbsp;given&nbsp;a&nbsp;set&nbsp;of&nbsp;sorted&nbsp;edges&nbsp;and&nbsp;contents&nbsp;forming&nbsp;a&nbsp;histogram.<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;values&nbsp;=&nbsp;numpy.array([1,1,2,3])<br>
+&gt;&gt;&gt;&nbsp;edges&nbsp;=&nbsp;numpy.array([1,2,3,4,5])<br>
+&gt;&gt;&gt;&nbsp;contents&nbsp;=&nbsp;numpy.array([10,20,30,40])<br>
+&gt;&gt;&gt;&nbsp;out&nbsp;=&nbsp;numpy.zeros_like(values)<br>
+&gt;&gt;&gt;&nbsp;<a href="#-get_bin_contents">get_bin_contents</a>(backend_cpu,&nbsp;values,&nbsp;edges,&nbsp;contents,&nbsp;out)<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(out&nbsp;==&nbsp;numpy.array([20,&nbsp;20,&nbsp;30,&nbsp;40])))<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;values&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;edges&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;contents&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;out&nbsp;(TYPE):&nbsp;Description</tt></dd></dl>
+ <dl><dt><a name="-get_in_offsets"><strong>get_in_offsets</strong></a>(backend, offsets, content, indices, mask_rows=None, mask_content=None)</dt><dd><tt>Retrieves&nbsp;the&nbsp;per-event&nbsp;values&nbsp;corresponding&nbsp;to&nbsp;indices&nbsp;in&nbsp;the&nbsp;content&nbsp;array.<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;j&nbsp;=&nbsp;awkward.fromiter([[1.0,&nbsp;2.0],[3.0,&nbsp;4.0,&nbsp;5.0],&nbsp;[6.0,&nbsp;7.0],&nbsp;[8.0]])<br>
+&gt;&gt;&gt;&nbsp;#Retrieve&nbsp;the&nbsp;first&nbsp;non-masked&nbsp;value&nbsp;in&nbsp;the&nbsp;first&nbsp;and&nbsp;second&nbsp;event,&nbsp;and&nbsp;the&nbsp;second&nbsp;value&nbsp;in&nbsp;the&nbsp;third&nbsp;and&nbsp;fourth&nbsp;event<br>
+&gt;&gt;&gt;&nbsp;inds&nbsp;=&nbsp;numpy.array([0,&nbsp;0,&nbsp;1,&nbsp;1])<br>
+&gt;&gt;&gt;&nbsp;mr&nbsp;=&nbsp;numpy.array([True,&nbsp;True,&nbsp;True,&nbsp;False])&nbsp;#&nbsp;Disable&nbsp;the&nbsp;last&nbsp;event&nbsp;([8.0])<br>
+&gt;&gt;&gt;&nbsp;mc&nbsp;=&nbsp;numpy.array([True,&nbsp;True,&nbsp;False,&nbsp;True,&nbsp;True,&nbsp;True,&nbsp;True,&nbsp;True])&nbsp;#&nbsp;Disable&nbsp;the&nbsp;3rd&nbsp;value&nbsp;(3.0)<br>
+&gt;&gt;&gt;&nbsp;r&nbsp;=&nbsp;<a href="#-get_in_offsets">get_in_offsets</a>(backend_cpu,&nbsp;j.offsets,&nbsp;j.content,&nbsp;inds,&nbsp;mask_rows=mr,&nbsp;mask_content=mc)<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(r&nbsp;==&nbsp;numpy.array([1.0,&nbsp;4.0,&nbsp;7.0,&nbsp;0.0])))<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;offsets&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;indices&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask_rows&nbsp;(None,&nbsp;optional):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask_content&nbsp;(None,&nbsp;optional):&nbsp;Description<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;TYPE:&nbsp;Description</tt></dd></dl>
+ <dl><dt><a name="-histogram_from_vector"><strong>histogram_from_vector</strong></a>(backend, data, weights, bins, mask=None)</dt><dd><tt>Fills&nbsp;the&nbsp;weighted&nbsp;values&nbsp;in&nbsp;a&nbsp;data&nbsp;array&nbsp;to&nbsp;a&nbsp;histogram&nbsp;specified&nbsp;by&nbsp;a&nbsp;sorted&nbsp;one-dimensional&nbsp;bin&nbsp;array.<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;data&nbsp;=&nbsp;numpy.array([1,1,1,2,3],&nbsp;dtype=numpy.float32)<br>
+&gt;&gt;&gt;&nbsp;weights&nbsp;=&nbsp;numpy.array([1,1,1,2,1],&nbsp;dtype=numpy.float32)<br>
+&gt;&gt;&gt;&nbsp;bins&nbsp;=&nbsp;numpy.array([0,1,2,3,4,5],&nbsp;dtype=numpy.float32)<br>
+&gt;&gt;&gt;&nbsp;mask&nbsp;=&nbsp;numpy.array([False,&nbsp;True,&nbsp;True,&nbsp;True,&nbsp;True])<br>
+&gt;&gt;&gt;&nbsp;r&nbsp;=&nbsp;<a href="#-histogram_from_vector">histogram_from_vector</a>(backend_cpu,&nbsp;data,&nbsp;weights,&nbsp;bins,&nbsp;mask=mask)<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(r[0]&nbsp;==&nbsp;numpy.array([0.,&nbsp;2.,&nbsp;2.,&nbsp;1.,&nbsp;0.])))<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(r[1]&nbsp;==&nbsp;numpy.array([0.,&nbsp;2.,&nbsp;4.,&nbsp;1.,&nbsp;0.])))<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(r[2]&nbsp;==&nbsp;bins))<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;Data&nbsp;array&nbsp;of&nbsp;samples&nbsp;to&nbsp;fill&nbsp;into&nbsp;the&nbsp;histogram<br>
+&nbsp;&nbsp;&nbsp;&nbsp;weights&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;Per-sample&nbsp;weights<br>
+&nbsp;&nbsp;&nbsp;&nbsp;bins&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;Sorted&nbsp;one&nbsp;dimensional&nbsp;bin&nbsp;array<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask&nbsp;(array&nbsp;of&nbsp;bool,&nbsp;optional):&nbsp;Sample&nbsp;mask&nbsp;to&nbsp;disable&nbsp;filling&nbsp;certain&nbsp;elements<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tuple&nbsp;of&nbsp;arrays&nbsp;(w,&nbsp;w^2,&nbsp;bins):&nbsp;A&nbsp;tuple&nbsp;of&nbsp;weight,&nbsp;squared&nbsp;weight&nbsp;and&nbsp;bin&nbsp;arrays</tt></dd></dl>
+ <dl><dt><a name="-histogram_from_vector_several"><strong>histogram_from_vector_several</strong></a>(backend, variables, weights, mask)</dt><dd><tt>Fills&nbsp;several&nbsp;data&nbsp;arrays&nbsp;into&nbsp;histograms&nbsp;simultaneously.&nbsp;On&nbsp;a&nbsp;GPU,&nbsp;this&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;faster&nbsp;than&nbsp;calling&nbsp;the&nbsp;histogram&nbsp;function&nbsp;several&nbsp;times&nbsp;due&nbsp;to&nbsp;the&nbsp;overhead<br>
+&nbsp;&nbsp;&nbsp;&nbsp;of&nbsp;calling&nbsp;simple&nbsp;kernels.<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;variables&nbsp;=&nbsp;[(numpy.array([1,1,1,2,3],&nbsp;dtype=numpy.float32),&nbsp;numpy.array([0,1,2,3,4,5],&nbsp;dtype=numpy.float32))]<br>
+&gt;&gt;&gt;&nbsp;weights&nbsp;=&nbsp;numpy.array([1,1,1,2,1],&nbsp;dtype=numpy.float32)<br>
+&gt;&gt;&gt;&nbsp;mask&nbsp;=&nbsp;numpy.array([False,&nbsp;True,&nbsp;True,&nbsp;True,&nbsp;True])<br>
+&gt;&gt;&gt;&nbsp;r&nbsp;=&nbsp;<a href="#-histogram_from_vector_several">histogram_from_vector_several</a>(backend_cpu,&nbsp;variables,&nbsp;weights,&nbsp;mask)<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(r[0][0]&nbsp;==&nbsp;numpy.array([0.,&nbsp;2.,&nbsp;2.,&nbsp;1.,&nbsp;0.])))<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(r[0][1]&nbsp;==&nbsp;numpy.array([0.,&nbsp;2.,&nbsp;4.,&nbsp;1.,&nbsp;0.])))<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(r[0][2]&nbsp;==&nbsp;variables[0][1]))<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;variables&nbsp;(list&nbsp;of&nbsp;(data,&nbsp;bins)&nbsp;tuples):&nbsp;Pairs&nbsp;of&nbsp;sample&nbsp;data&nbsp;and&nbsp;bin&nbsp;arrays<br>
+&nbsp;&nbsp;&nbsp;&nbsp;weights&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;Per-sample&nbsp;weight&nbsp;array<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask&nbsp;(array&nbsp;of&nbsp;bool):&nbsp;Per-sample&nbsp;mask&nbsp;to&nbsp;enable&nbsp;or&nbsp;disable&nbsp;samples<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;(w,&nbsp;w^2,&nbsp;bins)&nbsp;tuples:&nbsp;A&nbsp;list&nbsp;of&nbsp;tuples&nbsp;of&nbsp;weight,&nbsp;squared&nbsp;weight&nbsp;and&nbsp;bin&nbsp;arrays&nbsp;for&nbsp;each&nbsp;variable</tt></dd></dl>
+ <dl><dt><a name="-mask_deltar_first"><strong>mask_deltar_first</strong></a>(backend, objs1, mask1, objs2, mask2, drcut)</dt><dd><tt>Masks&nbsp;objects&nbsp;in&nbsp;the&nbsp;first&nbsp;collection&nbsp;that&nbsp;are&nbsp;closer&nbsp;than&nbsp;drcut&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;objects&nbsp;in&nbsp;the&nbsp;second&nbsp;collection&nbsp;according&nbsp;to&nbsp;dR=sqrt(dEta^2&nbsp;+&nbsp;dPhi^2)&nbsp;<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;objs1&nbsp;(dict):&nbsp;a&nbsp;dictionary&nbsp;containing&nbsp;the&nbsp;"eta"&nbsp;and&nbsp;"phi"&nbsp;arrays&nbsp;for&nbsp;the&nbsp;first&nbsp;collection<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask1&nbsp;(array&nbsp;of&nbsp;bool):&nbsp;Mask&nbsp;of&nbsp;objects&nbsp;in&nbsp;the&nbsp;first&nbsp;collection&nbsp;that&nbsp;are&nbsp;not&nbsp;used&nbsp;for&nbsp;the&nbsp;matching<br>
+&nbsp;&nbsp;&nbsp;&nbsp;objs2&nbsp;(TYPE):&nbsp;a&nbsp;dictionary&nbsp;containing&nbsp;the&nbsp;"eta"&nbsp;and&nbsp;"phi"&nbsp;arrays&nbsp;for&nbsp;the&nbsp;second&nbsp;collection<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask2&nbsp;(array&nbsp;of&nbsp;bool):&nbsp;Mask&nbsp;of&nbsp;objects&nbsp;in&nbsp;the&nbsp;second&nbsp;collection&nbsp;that&nbsp;are&nbsp;not&nbsp;used&nbsp;for&nbsp;the&nbsp;matching<br>
+&nbsp;&nbsp;&nbsp;&nbsp;drcut&nbsp;(float):&nbsp;Minimum&nbsp;delta&nbsp;R&nbsp;value&nbsp;between&nbsp;objects<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;array&nbsp;of&nbsp;bool:&nbsp;Mask&nbsp;for&nbsp;objects&nbsp;in&nbsp;the&nbsp;first&nbsp;collection&nbsp;that&nbsp;are&nbsp;closer<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;than&nbsp;drcut&nbsp;to&nbsp;objects&nbsp;in&nbsp;the&nbsp;second&nbsp;collection</tt></dd></dl>
+ <dl><dt><a name="-max_in_offsets"><strong>max_in_offsets</strong></a>(backend, offsets, content, mask_rows=None, mask_content=None)</dt><dd><tt>Summary<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;j&nbsp;=&nbsp;awkward.fromiter([[1.0,&nbsp;2.0],[3.0,&nbsp;4.0,&nbsp;5.0],&nbsp;[6.0,&nbsp;7.0],&nbsp;[8.0]])<br>
+&gt;&gt;&gt;&nbsp;mr&nbsp;=&nbsp;numpy.array([True,&nbsp;True,&nbsp;True,&nbsp;False])&nbsp;#&nbsp;Disable&nbsp;the&nbsp;last&nbsp;event&nbsp;([8.0])<br>
+&gt;&gt;&gt;&nbsp;mc&nbsp;=&nbsp;numpy.array([True,&nbsp;True,&nbsp;True,&nbsp;True,&nbsp;False,&nbsp;True,&nbsp;True,&nbsp;True])&nbsp;#&nbsp;Disable&nbsp;the&nbsp;5th&nbsp;value&nbsp;(5.0)<br>
+&gt;&gt;&gt;&nbsp;r&nbsp;=&nbsp;<a href="#-max_in_offsets">max_in_offsets</a>(backend_cpu,&nbsp;j.offsets,&nbsp;j.content,&nbsp;mask_rows=mr,&nbsp;mask_content=mc)<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(r&nbsp;==&nbsp;numpy.array([2.0,&nbsp;4.0,&nbsp;7.0,&nbsp;0.0])))<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;offsets&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask_rows&nbsp;(None,&nbsp;optional):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask_content&nbsp;(None,&nbsp;optional):&nbsp;Description<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;TYPE:&nbsp;Description</tt></dd></dl>
+ <dl><dt><a name="-min_in_offsets"><strong>min_in_offsets</strong></a>(backend, offsets, content, mask_rows=None, mask_content=None)</dt><dd><tt>Summary<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;j&nbsp;=&nbsp;awkward.fromiter([[1.0,&nbsp;2.0],[3.0,&nbsp;4.0,&nbsp;5.0],&nbsp;[6.0,&nbsp;7.0],&nbsp;[8.0]])<br>
+&gt;&gt;&gt;&nbsp;mr&nbsp;=&nbsp;numpy.array([True,&nbsp;True,&nbsp;True,&nbsp;False])&nbsp;#&nbsp;Disable&nbsp;the&nbsp;last&nbsp;event&nbsp;([8.0])<br>
+&gt;&gt;&gt;&nbsp;mc&nbsp;=&nbsp;numpy.array([True,&nbsp;True,&nbsp;True,&nbsp;True,&nbsp;False,&nbsp;True,&nbsp;True,&nbsp;True])&nbsp;#&nbsp;Disable&nbsp;the&nbsp;5th&nbsp;value&nbsp;(5.0)<br>
+&gt;&gt;&gt;&nbsp;r&nbsp;=&nbsp;<a href="#-min_in_offsets">min_in_offsets</a>(backend_cpu,&nbsp;j.offsets,&nbsp;j.content,&nbsp;mask_rows=mr,&nbsp;mask_content=mc)<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(r&nbsp;==&nbsp;numpy.array([1.0,&nbsp;3.0,&nbsp;6.0,&nbsp;0.0])))<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;offsets&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask_rows&nbsp;(None,&nbsp;optional):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask_content&nbsp;(None,&nbsp;optional):&nbsp;Description<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;TYPE:&nbsp;Description</tt></dd></dl>
+ <dl><dt><a name="-prod_in_offsets"><strong>prod_in_offsets</strong></a>(backend, offsets, content, mask_rows=None, mask_content=None, dtype=None)</dt><dd><tt>Summary<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;j&nbsp;=&nbsp;awkward.fromiter([[1.0,&nbsp;2.0],[3.0,&nbsp;4.0,&nbsp;5.0],&nbsp;[6.0,&nbsp;7.0],&nbsp;[8.0]])<br>
+&gt;&gt;&gt;&nbsp;mr&nbsp;=&nbsp;numpy.array([True,&nbsp;True,&nbsp;True,&nbsp;False])&nbsp;#&nbsp;Disable&nbsp;the&nbsp;last&nbsp;event&nbsp;([8.0])<br>
+&gt;&gt;&gt;&nbsp;mc&nbsp;=&nbsp;numpy.array([True,&nbsp;True,&nbsp;True,&nbsp;True,&nbsp;False,&nbsp;True,&nbsp;True,&nbsp;True])&nbsp;#&nbsp;Disable&nbsp;the&nbsp;5th&nbsp;value&nbsp;(5.0)<br>
+&gt;&gt;&gt;&nbsp;r&nbsp;=&nbsp;<a href="#-prod_in_offsets">prod_in_offsets</a>(backend_cpu,&nbsp;j.offsets,&nbsp;j.content,&nbsp;mask_rows=mr,&nbsp;mask_content=mc)<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(r&nbsp;==&nbsp;numpy.array([2.0,&nbsp;12.0,&nbsp;42.0,&nbsp;1.0])))<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;offsets&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask_rows&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask_content&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dtype&nbsp;(None,&nbsp;optional):&nbsp;Description<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;TYPE:&nbsp;Description</tt></dd></dl>
+ <dl><dt><a name="-searchsorted"><strong>searchsorted</strong></a>(backend, arr, vals, side='right')</dt><dd><tt>Finds&nbsp;where&nbsp;to&nbsp;insert&nbsp;the&nbsp;values&nbsp;in&nbsp;'vals'&nbsp;into&nbsp;a&nbsp;sorted&nbsp;array&nbsp;'arr'&nbsp;to&nbsp;preserve&nbsp;order,&nbsp;as&nbsp;np.searchsorted.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;arr&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;sorted&nbsp;array&nbsp;of&nbsp;bin&nbsp;edges<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vals&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;array&nbsp;of&nbsp;values&nbsp;to&nbsp;insert&nbsp;into&nbsp;the&nbsp;sorted&nbsp;array<br>
+&nbsp;&nbsp;&nbsp;&nbsp;side&nbsp;(str,&nbsp;optional):&nbsp;"left"&nbsp;or&nbsp;"right"&nbsp;as&nbsp;in&nbsp;np.searchsorted<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;array&nbsp;of&nbsp;ints:&nbsp;Indices&nbsp;into&nbsp;'arr'&nbsp;where&nbsp;the&nbsp;values&nbsp;would&nbsp;be&nbsp;inserted</tt></dd></dl>
+ <dl><dt><a name="-select_opposite_sign"><strong>select_opposite_sign</strong></a>(backend, offsets, charges, in_mask)</dt><dd><tt>Summary<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;offsets&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;charges&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;in_mask&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;TYPE:&nbsp;Description</tt></dd></dl>
+ <dl><dt><a name="-set_in_offsets"><strong>set_in_offsets</strong></a>(backend, offsets, content, indices, target, mask_rows=None, mask_content=None)</dt><dd><tt>Sets&nbsp;the&nbsp;per-event&nbsp;values&nbsp;corresponding&nbsp;to&nbsp;indices&nbsp;in&nbsp;the&nbsp;content&nbsp;array&nbsp;to&nbsp;the&nbsp;values&nbsp;in&nbsp;the&nbsp;target&nbsp;array.<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;j&nbsp;=&nbsp;awkward.fromiter([[0.0,&nbsp;0.0],[0.0,&nbsp;0.0,&nbsp;0.0],&nbsp;[0.0,&nbsp;0.0],&nbsp;[0.0]])<br>
+&gt;&gt;&gt;&nbsp;inds&nbsp;=&nbsp;numpy.array([0,&nbsp;0,&nbsp;1,&nbsp;1])<br>
+&gt;&gt;&gt;&nbsp;target&nbsp;=&nbsp;numpy.array([1,&nbsp;2,&nbsp;3,&nbsp;4])<br>
+&gt;&gt;&gt;&nbsp;mr&nbsp;=&nbsp;numpy.array([True,&nbsp;True,&nbsp;True,&nbsp;False])&nbsp;#&nbsp;Disable&nbsp;the&nbsp;last&nbsp;event<br>
+&gt;&gt;&gt;&nbsp;mc&nbsp;=&nbsp;numpy.array([True,&nbsp;True,&nbsp;False,&nbsp;True,&nbsp;True,&nbsp;True,&nbsp;True,&nbsp;True])&nbsp;#&nbsp;Disable&nbsp;the&nbsp;3rd&nbsp;value&nbsp;in&nbsp;the&nbsp;content&nbsp;array<br>
+&gt;&gt;&gt;&nbsp;<a href="#-set_in_offsets">set_in_offsets</a>(backend_cpu,&nbsp;j.offsets,&nbsp;j.content,&nbsp;inds,&nbsp;target,&nbsp;mask_rows=mr,&nbsp;mask_content=mc)<br>
+&gt;&gt;&gt;&nbsp;r&nbsp;=&nbsp;j&nbsp;==&nbsp;awkward.fromiter([[1.0,&nbsp;0.0],[0.0,&nbsp;2.0,&nbsp;0.0],&nbsp;[0.0,&nbsp;3.0],&nbsp;[0.0]])<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(r.content))<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;offsets&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;indices&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;target&nbsp;(TYPE):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask_rows&nbsp;(None,&nbsp;optional):&nbsp;Description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask_content&nbsp;(None,&nbsp;optional):&nbsp;Description</tt></dd></dl>
+ <dl><dt><a name="-spherical_to_cartesian"><strong>spherical_to_cartesian</strong></a>(backend, pt, eta, phi, mass)</dt><dd><tt>Converts&nbsp;an&nbsp;array&nbsp;of&nbsp;spherical&nbsp;four-momentum&nbsp;coordinates&nbsp;(pt,&nbsp;eta,&nbsp;phi,&nbsp;mass)&nbsp;to&nbsp;cartesian&nbsp;(px,&nbsp;py&nbsp;,pz,&nbsp;E).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pt&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;Data&nbsp;array&nbsp;of&nbsp;the&nbsp;transverse&nbsp;momentum&nbsp;values&nbsp;(numpy&nbsp;or&nbsp;cupy)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;eta&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;Data&nbsp;array&nbsp;of&nbsp;the&nbsp;pseudorapidity<br>
+&nbsp;&nbsp;&nbsp;&nbsp;phi&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;Data&nbsp;array&nbsp;of&nbsp;the&nbsp;azimuthal&nbsp;angle<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mass&nbsp;(array&nbsp;of&nbsp;floats):&nbsp;Data&nbsp;array&nbsp;of&nbsp;the&nbsp;mass<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tuple&nbsp;of&nbsp;arrays:&nbsp;returns&nbsp;the&nbsp;numpy&nbsp;or&nbsp;cupy&nbsp;arrays&nbsp;(px,&nbsp;py,&nbsp;pz,&nbsp;E)</tt></dd></dl>
+ <dl><dt><a name="-sum_in_offsets"><strong>sum_in_offsets</strong></a>(backend, offsets, content, mask_rows=None, mask_content=None, dtype=None)</dt><dd><tt>Sums&nbsp;the&nbsp;values&nbsp;in&nbsp;a&nbsp;depth-1&nbsp;jagged&nbsp;array&nbsp;within&nbsp;the&nbsp;offsets,&nbsp;e.g.&nbsp;to&nbsp;compute&nbsp;a&nbsp;per-event&nbsp;sum<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;j&nbsp;=&nbsp;awkward.fromiter([[1.0,&nbsp;2.0],[3.0,&nbsp;4.0,&nbsp;5.0],&nbsp;[6.0,&nbsp;7.0],&nbsp;[8.0]])<br>
+&gt;&gt;&gt;&nbsp;mr&nbsp;=&nbsp;numpy.array([True,&nbsp;True,&nbsp;True,&nbsp;False])&nbsp;#&nbsp;Disable&nbsp;the&nbsp;last&nbsp;event&nbsp;([8.0])<br>
+&gt;&gt;&gt;&nbsp;mc&nbsp;=&nbsp;numpy.array([True,&nbsp;True,&nbsp;True,&nbsp;True,&nbsp;False,&nbsp;True,&nbsp;True,&nbsp;True])&nbsp;#&nbsp;Disable&nbsp;the&nbsp;5th&nbsp;value&nbsp;(5.0)<br>
+&gt;&gt;&gt;&nbsp;r&nbsp;=&nbsp;<a href="#-sum_in_offsets">sum_in_offsets</a>(backend_cpu,&nbsp;j.offsets,&nbsp;j.content,&nbsp;mask_rows=mr,&nbsp;mask_content=mc)<br>
+&gt;&gt;&gt;&nbsp;assert(numpy.all(r&nbsp;==&nbsp;numpy.array([3.0,&nbsp;7.0,&nbsp;13.0,&nbsp;0.0])))<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;backend&nbsp;(library):&nbsp;either&nbsp;hepaccelerate.backend_cpu&nbsp;or&nbsp;hepaccelerate.backend_cuda<br>
+&nbsp;&nbsp;&nbsp;&nbsp;offsets&nbsp;(array&nbsp;of&nbsp;uint64):&nbsp;one&nbsp;dimensional&nbsp;offsets&nbsp;of&nbsp;the&nbsp;jagged&nbsp;array&nbsp;(depth&nbsp;1)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content&nbsp;(array):&nbsp;data&nbsp;array&nbsp;to&nbsp;sum&nbsp;over<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask_rows&nbsp;(array&nbsp;of&nbsp;bool,&nbsp;optional):&nbsp;Mask&nbsp;the&nbsp;values&nbsp;in&nbsp;the&nbsp;offset&nbsp;array&nbsp;that&nbsp;are&nbsp;set&nbsp;to&nbsp;False<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mask_content&nbsp;(array&nbsp;of&nbsp;bool,&nbsp;optional):&nbsp;Mask&nbsp;the&nbsp;values&nbsp;in&nbsp;the&nbsp;data&nbsp;array&nbsp;that&nbsp;are&nbsp;set&nbsp;to&nbsp;False<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dtype&nbsp;(data&nbsp;type,&nbsp;optional):&nbsp;Output&nbsp;data&nbsp;type,&nbsp;useful&nbsp;to&nbsp;specify&nbsp;e.g.&nbsp;int8&nbsp;when&nbsp;summing&nbsp;over&nbsp;booleans<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;array:&nbsp;Totals&nbsp;within&nbsp;the&nbsp;offsets</tt></dd></dl>
+</td></tr></table>
+</body></html>
