@@ -371,6 +371,10 @@ class TestKernels(unittest.TestCase):
         pt, eta, phi, mass = jets.pt/1000.0, jets.eta, jets.phi, self.NUMPY_LIB.ones(len(jets.pt), dtype=self.NUMPY_LIB.float32)
         px, py, pz, e = kernels.spherical_to_cartesian(self.ha, pt, eta, phi, mass)
         pt2, eta2, phi2, mass2 = kernels.cartesian_to_spherical(self.ha, px, py, pz, e)
+        self.assertTrue(self.NUMPY_LIB.sum((pt - pt2)**2)/jets.numobjects() < 1e-6)
+        self.assertTrue(self.NUMPY_LIB.sum((eta - eta2)**2)/jets.numobjects() < 1e-6)
+        self.assertTrue(self.NUMPY_LIB.sum((phi - phi2)**2)/jets.numobjects() < 1e-6)
+        self.assertTrue(self.NUMPY_LIB.sum((mass - mass2)**2)/jets.numobjects() < 1e-3)
         return jets.numevents()
 
     def test_coordinate_transformation(self):
