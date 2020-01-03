@@ -31,85 +31,91 @@ def time_kernel(dataset, test_kernel):
     return speed
 
 def test_kernel_sum_in_offsets(dataset):
-    muons = dataset.structs["lep"][0]
-    sel_ev = nplib.ones(muons.numevents(), dtype=nplib.bool)
-    sel_mu = nplib.ones(muons.numobjects(), dtype=nplib.bool)
+    leptons = dataset.structs["lep"][0]
+    sel_ev = nplib.ones(leptons.numevents(), dtype=nplib.bool)
+    sel_mu = nplib.ones(leptons.numobjects(), dtype=nplib.bool)
     z = kernels.sum_in_offsets(
         backend,
-        muons.offsets,
-        muons.pt,
+        leptons.offsets,
+        leptons.pt,
         sel_ev,
         sel_mu, dtype=nplib.float32)
 
 def test_kernel_simple_cut(dataset):
-    muons = dataset.structs["lep"][0]
-    sel_mu = muons.pt > 30.0
+    leptons = dataset.structs["lep"][0]
+    sel_mu = leptons.pt > 30.0
 
 def test_kernel_max_in_offsets(dataset):
-    muons = dataset.structs["lep"][0]
-    sel_ev = nplib.ones(muons.numevents(), dtype=nplib.bool)
-    sel_mu = nplib.ones(muons.numobjects(), dtype=nplib.bool)
+    leptons = dataset.structs["lep"][0]
+    sel_ev = nplib.ones(leptons.numevents(), dtype=nplib.bool)
+    sel_mu = nplib.ones(leptons.numobjects(), dtype=nplib.bool)
     z = kernels.max_in_offsets(
         backend,
-        muons.offsets,
-        muons.pt,
+        leptons.offsets,
+        leptons.pt,
         sel_ev,
         sel_mu)
     
 def test_kernel_get_in_offsets(dataset):
-   muons = dataset.structs["lep"][0]
-   sel_ev = nplib.ones(muons.numevents(), dtype=nplib.bool)
-   sel_mu = nplib.ones(muons.numobjects(), dtype=nplib.bool)
-   inds = nplib.zeros(muons.numevents(), dtype=nplib.int8)
+   leptons = dataset.structs["lep"][0]
+   sel_ev = nplib.ones(leptons.numevents(), dtype=nplib.bool)
+   sel_mu = nplib.ones(leptons.numobjects(), dtype=nplib.bool)
+   inds = nplib.zeros(leptons.numevents(), dtype=nplib.int8)
    inds[:] = 0
    z = kernels.get_in_offsets(
        backend,
-       muons.offsets,
-       muons.pt,
+       leptons.offsets,
+       leptons.pt,
        inds,
        sel_ev,
        sel_mu)
 
 def test_kernel_mask_deltar_first(dataset):
-    muons = dataset.structs["lep"][0]
+    leptons = dataset.structs["lep"][0]
     jet = dataset.structs["jet"][0]
-    sel_ev = nplib.ones(muons.numevents(), dtype=nplib.bool)
-    sel_mu = nplib.ones(muons.numobjects(), dtype=nplib.bool)
+    sel_ev = nplib.ones(leptons.numevents(), dtype=nplib.bool)
+    sel_mu = nplib.ones(leptons.numobjects(), dtype=nplib.bool)
     sel_jet = (jet.pt > 10)
-    muons_matched_to_jet = kernels.mask_deltar_first(
+    leptons_matched_to_jet = kernels.mask_deltar_first(
         backend,
-        {"offsets": muons.offsets, "eta": muons.eta, "phi": muons.phi},
+        {"offsets": leptons.offsets, "eta": leptons.eta, "phi": leptons.phi},
         sel_mu,
         {"offsets": jet.offsets, "eta": jet.eta, "phi": jet.phi},
         sel_jet, 0.3
     )
 
 def test_kernel_histogram_from_vector(dataset):
-    muons = dataset.structs["lep"][0]
-    weights = 2*nplib.ones(muons.numobjects(), dtype=nplib.float32)
-    ret = kernels.histogram_from_vector(backend, muons.pt, weights, nplib.linspace(0,200,100, dtype=nplib.float32))
+    leptons = dataset.structs["lep"][0]
+    weights = 2*nplib.ones(leptons.numobjects(), dtype=nplib.float32)
+    ret = kernels.histogram_from_vector(backend, leptons.pt, weights, nplib.linspace(0,200,100, dtype=nplib.float32))
 
 def test_kernel_histogram_from_vector_several(dataset):
-    muons = dataset.structs["lep"][0]
-    mask = nplib.ones(muons.numobjects(), dtype=nplib.bool)
+    leptons = dataset.structs["lep"][0]
+    mask = nplib.ones(leptons.numobjects(), dtype=nplib.bool)
     mask[:100] = False
-    weights = 2*nplib.ones(muons.numobjects(), dtype=nplib.float32)
+    weights = 2*nplib.ones(leptons.numobjects(), dtype=nplib.float32)
     variables = [
-        (muons.pt, nplib.linspace(0,200,100, dtype=nplib.float32)),
-        (muons.eta, nplib.linspace(-4,4,100, dtype=nplib.float32)),
-        (muons.phi, nplib.linspace(-4,4,100, dtype=nplib.float32)),
-        (muons.z0, nplib.linspace(0,200,100, dtype=nplib.float32)),
-        (muons.charge, nplib.array([-1, 0, 1, 2], dtype=nplib.float32)),
+        (leptons.pt, nplib.linspace(0,200,100, dtype=nplib.float32)),
+        (leptons.eta, nplib.linspace(-4,4,100, dtype=nplib.float32)),
+        (leptons.phi, nplib.linspace(-4,4,100, dtype=nplib.float32)),
+        (leptons.z0, nplib.linspace(0,200,100, dtype=nplib.float32)),
+        (leptons.charge, nplib.array([-1, 0, 1, 2], dtype=nplib.float32)),
     ]
     ret = kernels.histogram_from_vector_several(backend, variables, weights, mask)
     
 def test_kernel_select_opposite_sign(dataset):
-    muons = dataset.structs["lep"][0]
-    sel_ev = nplib.ones(muons.numevents(), dtype=nplib.bool)
-    sel_mu = nplib.ones(muons.numobjects(), dtype=nplib.bool)
-    muons_passing_os = kernels.select_opposite_sign(
+    leptons = dataset.structs["lep"][0]
+    sel_ev = nplib.ones(leptons.numevents(), dtype=nplib.bool)
+    sel_mu = nplib.ones(leptons.numobjects(), dtype=nplib.bool)
+    leptons_passing_os = kernels.select_opposite_sign(
         backend,
-        muons.offsets, muons.charge, sel_mu)
+        leptons.offsets, leptons.charge, sel_mu)
+
+def test_kernel_coordinate_transformations(dataset):
+    jets = dataset.structs["jet"][0]
+    pt, eta, phi, mass = jets.pt/1000.0, jets.eta, jets.phi, nplib.ones(len(jets.pt), dtype=nplib.float32)
+    px, py, pz, e = kernels.spherical_to_cartesian(backend, pt, eta, phi, mass)
+    pt2, eta2, phi2, mass2 = kernels.cartesian_to_spherical(backend, px, py, pz, e)
 
 def test_timing(ds):
     with open("data/kernel_benchmarks.txt", "a") as of:
@@ -156,8 +162,8 @@ def run_timing(ds):
     ret["mask_deltar_first"] = t/1000/1000
     
     t = time_kernel(ds, test_kernel_select_opposite_sign)
-    print("select_muons_opposite_sign {0:.2f} MHz".format(t/1000/1000))
-    ret["select_muons_opposite_sign"] = t/1000/1000
+    print("select_opposite_sign {0:.2f} MHz".format(t/1000/1000))
+    ret["select_opposite_sign"] = t/1000/1000
     
     t = time_kernel(ds, test_kernel_histogram_from_vector)
     print("histogram_from_vector {0:.2f} MHz".format(t/1000/1000))
@@ -166,6 +172,11 @@ def run_timing(ds):
     t = time_kernel(ds, test_kernel_histogram_from_vector_several)
     print("histogram_from_vector_several {0:.2f} MHz".format(t/1000/1000))
     ret["histogram_from_vector_several"] = t/1000/1000
+    
+    t = time_kernel(ds, test_kernel_coordinate_transformations)
+    print("coordinate_transformations {0:.2f} MHz".format(t/1000/1000))
+    ret["coordinate_transformations"] = t/1000/1000
+    
     return ret
 
 if __name__ == "__main__":

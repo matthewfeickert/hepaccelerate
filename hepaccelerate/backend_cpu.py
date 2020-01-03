@@ -3,7 +3,7 @@ import numba
 import numpy as np
 import math
 
-@numba.njit(fastmath=True)
+@numba.njit(fastmath=False)
 def spherical_to_cartesian(pt, eta, phi, mass):
     px = pt * np.cos(phi)
     py = pt * np.sin(phi)
@@ -11,7 +11,7 @@ def spherical_to_cartesian(pt, eta, phi, mass):
     e = np.sqrt(px**2 + py**2 + pz**2 + mass**2)
     return px, py, pz, e
 
-@numba.njit(fastmath=True)
+@numba.njit(fastmath=False)
 def cartesian_to_spherical(px, py, pz, e):
     pt = np.sqrt(px**2 + py**2)
     eta = np.arcsinh(pz / pt)

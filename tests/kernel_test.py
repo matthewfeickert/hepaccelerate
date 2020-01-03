@@ -216,7 +216,6 @@ class TestKernels(unittest.TestCase):
             target,
             sel_ev,
             sel_mu)
-        print(arr)
 
         print("checking set_in_offsets")
         asnp = self.NUMPY_LIB.asnumpy
@@ -365,6 +364,15 @@ class TestKernels(unittest.TestCase):
 
         return leptons.numevents()
 
+    def test_kernel_coordinate_transformations(self):
+        print("kernel_coordinate_transformations")
+        dataset = self.dataset
+        jets = dataset.structs["jet"][0]
+        pt, eta, phi, mass = jets.pt/1000.0, jets.eta, jets.phi, self.NUMPY_LIB.ones(len(jets.pt), dtype=self.NUMPY_LIB.float32)
+        px, py, pz, e = kernels.spherical_to_cartesian(self.ha, pt, eta, phi, mass)
+        pt2, eta2, phi2, mass2 = kernels.cartesian_to_spherical(self.ha, px, py, pz, e)
+        return jets.numevents()
+
     def test_coordinate_transformation(self):
         print("coordinate_transformation")
         #Don't test the scalar ops on GPU
@@ -398,7 +406,7 @@ class TestKernels(unittest.TestCase):
             self.assertAlmostEqual(pt_tot, 114.83390378237536)
             self.assertAlmostEqual(eta_tot, 0.13980652560764573)
             self.assertAlmostEqual(phi_tot, 0.2747346427265487)
-            self.assertAlmostEqual(mass_tot, 126.24366428840153)
+            self.assertAlmostEqual(mass_tot, 126.24366687824714)
 
 if __name__ == "__main__":
     if "--debug" in sys.argv:
