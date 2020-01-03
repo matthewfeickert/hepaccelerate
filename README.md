@@ -15,7 +15,7 @@
 **Under active development and use by a few CMS analyses!**
 
 <p float="left">
-  <img src="https://github.com/hepaccelerate/hepaccelerate/blob/master/paper/plots/kernel_benchmarks.png" alt="Kernel benchmarks" width="300"/>
+  <img src="https://github.com/hepaccelerate/hepaccelerate/blob/master/paper/plots/kernel_speedup.png" alt="Kernel benchmarks" width="300"/>
   <img src="https://github.com/hepaccelerate/hepaccelerate/blob/master/paper/plots/analysis_benchmark.png" alt="Analysis benchmarks" width="300"/>
 </p>
 
