@@ -82,7 +82,7 @@ def load_dataset(numpy_lib, num_iter=1):
         ],
     }
     dataset = Dataset(
-        "nanoaod", num_iter*["mc_147771.Zmumu.root"],
+        "nanoaod", num_iter*["data/mc_147771.Zmumu.root"],
         datastructures, treename="mini", datapath=""
     )
   
