@@ -46,49 +46,45 @@ def download_if_not_exists(filename, url):
 
 def load_dataset(numpy_lib, num_iter=1):
     print("loading dataset")
-    download_if_not_exists("data/nanoaod_test.root", "https://jpata.web.cern.ch/jpata/opendata_files/DY2JetsToLL-merged/1.root")
+    download_if_not_exists("data/mc_147771.Zmumu.root", "http://opendata.atlas.cern/release/samples/MC/mc_147771.Zmumu.root")
     datastructures = {
-        "Muon": [
-            ("Muon_pt", "float32"),
-            ("Muon_eta", "float32"),
-            ("Muon_phi", "float32"),
-            ("Muon_mass", "float32"),
-            ("Muon_charge", "int32"),
-            ("Muon_pfRelIso03_all", "float32"),
-            ("Muon_tightId", "bool")
+        "lep": [
+            ("lep_truthMatched", "bool"),
+            ("lep_trigMatched", "uint16"),
+            ("lep_pt", "float32"),
+            ("lep_eta", "float32"),
+            ("lep_phi", "float32"),
+            ("lep_E", "float32"),
+            ("lep_z0", "float32"),
+            ("lep_charge", "float32"),
+            ("lep_type", "uint32"),
+            ("lep_flag", "uint32"),
+            ("lep_ptcone30", "float32"),
+            ("lep_etcone20", "float32"),
+            ("lep_trackd0pvunbiased", "float32"),
+            ("lep_tracksigd0pvunbiased", "float32"),
         ],
-        "Electron": [
-            ("Electron_pt", "float32"),
-            ("Electron_eta", "float32"),
-            ("Electron_phi", "float32"),
-            ("Electron_mass", "float32"),
-            ("Electron_charge", "int32"),
-            ("Electron_pfRelIso03_all", "float32"),
-            ("Electron_pfId", "bool")
+        "jet": [
+            ("jet_pt", "float32"),
+            ("jet_eta", "float32"),
+            ("jet_phi", "float32"),
+            ("jet_E", "float32"),
+            ("jet_m", "float32"),
+            ("jet_jvf", "float32"),
+            ("jet_trueflav", "int32"),
+            ("jet_truthMatched", "int32"),
+            ("jet_SV0", "float32"),
+            ("jet_MV1", "float32"),
         ],
-        "Jet": [
-            ("Jet_pt", "float32"),
-            ("Jet_eta", "float32"),
-            ("Jet_phi", "float32"),
-            ("Jet_mass", "float32"),
-            ("Jet_btag", "float32"),
-            ("Jet_puId", "bool"),
-        ],
-
         "EventVariables": [
-            ("HLT_IsoMu24", "bool"),
-            ('MET_pt', 'float32'),
-            ('MET_phi', 'float32'),
-            ('MET_sumet', 'float32'),
-            ('MET_significance', 'float32'),
-            ('MET_CovXX', 'float32'),
-            ('MET_CovXY', 'float32'),
-            ('MET_CovYY', 'float32'),
-        ]
+            ("met_et", "float32"),
+            ("met_phi", "float32"),
+        ],
     }
     dataset = Dataset(
-        "nanoaod", num_iter*["./data/nanoaod_test.root"],
-        datastructures, treename="Events", datapath="")
+        "nanoaod", num_iter*["mc_147771.Zmumu.root"],
+        datastructures, treename="mini", datapath=""
+    )
   
     dataset.load_root(verbose=True)
     dataset.merge_inplace(verbose=True)
@@ -102,8 +98,8 @@ def verify_set_in_offsets(offsets_np, inds_np, arr_np, target_np):
         nmu = 0
         for imu in range(offsets_np[iev], offsets_np[iev+1]):
             if nmu == inds_np[iev]:
-                if arr_np[imu] != target_np[imu]:
-                    print("Mismatch detected in iev,imu", iev, imu)
+                if arr_np[imu] != target_np[iev]:
+                    print("Mismatch detected in iev,imu", iev, imu, arr_np[imu], target_np[iev])
                     return False
             nmu += 1
     return True 
@@ -113,7 +109,7 @@ def verify_get_in_offsets(offsets_np, inds_np, arr_np, target_np, z_np):
     for iev in range(len(offsets_np) - 1):
         nmu = 0
         
-        #Event that had no muons
+        #Event that had no leptons
         if offsets_np[iev] == offsets_np[iev+1]:
             if z_np[iev] !=  0:
                 print("Mismatch detected", iev)
@@ -159,72 +155,73 @@ class TestKernels(unittest.TestCase):
 
     def test_kernel_sum_in_offsets(self):
         dataset = self.dataset
-        muons = dataset.structs["Muon"][0]
-        sel_ev = self.NUMPY_LIB.ones(muons.numevents(), dtype=self.NUMPY_LIB.bool)
-        sel_mu = self.NUMPY_LIB.ones(muons.numobjects(), dtype=self.NUMPY_LIB.bool)
+        leptons = dataset.structs["lep"][0]
+        sel_ev = self.NUMPY_LIB.ones(leptons.numevents(), dtype=self.NUMPY_LIB.bool)
+        sel_mu = self.NUMPY_LIB.ones(leptons.numobjects(), dtype=self.NUMPY_LIB.bool)
         z = kernels.sum_in_offsets(
             self.ha,
-            muons.offsets,
-            muons.pt,
+            leptons.offsets,
+            leptons.pt,
             sel_ev,
             sel_mu, dtype=self.NUMPY_LIB.float32)
-        return muons.numevents()
+        return leptons.numevents()
 
     def test_kernel_max_in_offsets(self):
         dataset = self.dataset
-        muons = dataset.structs["Muon"][0]
-        sel_ev = self.NUMPY_LIB.ones(muons.numevents(), dtype=self.NUMPY_LIB.bool)
-        sel_mu = self.NUMPY_LIB.ones(muons.numobjects(), dtype=self.NUMPY_LIB.bool)
+        leptons = dataset.structs["lep"][0]
+        sel_ev = self.NUMPY_LIB.ones(leptons.numevents(), dtype=self.NUMPY_LIB.bool)
+        sel_mu = self.NUMPY_LIB.ones(leptons.numobjects(), dtype=self.NUMPY_LIB.bool)
         z = kernels.max_in_offsets(
             self.ha,
-            muons.offsets,
-            muons.pt,
+            leptons.offsets,
+            leptons.pt,
             sel_ev,
             sel_mu)
-        return muons.numevents()
+        return leptons.numevents()
 
     def test_kernel_get_in_offsets(self):
         dataset = self.dataset
-        muons = dataset.structs["Muon"][0]
-        sel_ev = self.NUMPY_LIB.ones(muons.numevents(), dtype=self.NUMPY_LIB.bool)
-        sel_mu = self.NUMPY_LIB.ones(muons.numobjects(), dtype=self.NUMPY_LIB.bool)
-        inds = self.NUMPY_LIB.zeros(muons.numevents(), dtype=self.NUMPY_LIB.int8)
+        leptons = dataset.structs["lep"][0]
+        sel_ev = self.NUMPY_LIB.ones(leptons.numevents(), dtype=self.NUMPY_LIB.bool)
+        sel_mu = self.NUMPY_LIB.ones(leptons.numobjects(), dtype=self.NUMPY_LIB.bool)
+        inds = self.NUMPY_LIB.zeros(leptons.numevents(), dtype=self.NUMPY_LIB.int8)
         inds[:] = 0
         z = kernels.get_in_offsets(
             self.ha,
-            muons.offsets,
-            muons.pt,
+            leptons.offsets,
+            leptons.pt,
             inds,
             sel_ev,
             sel_mu)
-        return muons.numevents()
+        return leptons.numevents()
 
     def test_kernel_set_get_in_offsets(self):
         print("kernel_set_get_in_offsets")
         dataset = self.dataset
-        muons = dataset.structs["Muon"][0]
-        arr = muons.pt.copy()
-        sel_ev = self.NUMPY_LIB.ones(muons.numevents(), dtype=self.NUMPY_LIB.bool)
-        sel_mu = self.NUMPY_LIB.ones(muons.numobjects(), dtype=self.NUMPY_LIB.bool)
-        inds = self.NUMPY_LIB.zeros(muons.numevents(), dtype=self.NUMPY_LIB.int8)
+        leptons = dataset.structs["lep"][0]
+        arr = leptons.pt.copy()
+        sel_ev = self.NUMPY_LIB.ones(leptons.numevents(), dtype=self.NUMPY_LIB.bool)
+        sel_mu = self.NUMPY_LIB.ones(leptons.numobjects(), dtype=self.NUMPY_LIB.bool)
+        inds = self.NUMPY_LIB.zeros(leptons.numevents(), dtype=self.NUMPY_LIB.uint32)
         
         #set the pt of the first muon in each event to 1 
         inds[:] = 0
-        target = self.NUMPY_LIB.ones(muons.numevents(), dtype=muons.pt.dtype)
+        target = self.NUMPY_LIB.ones(leptons.numevents(), dtype=leptons.pt.dtype)
 
         kernels.set_in_offsets(
             self.ha,
-            muons.offsets,
+            leptons.offsets,
             arr,
             inds,
             target,
             sel_ev,
             sel_mu)
+        print(arr)
 
         print("checking set_in_offsets")
         asnp = self.NUMPY_LIB.asnumpy
         self.assertTrue(verify_set_in_offsets(
-            asnp(muons.offsets),
+            asnp(leptons.offsets),
             asnp(inds),
             asnp(arr),
             asnp(target)
@@ -233,119 +230,119 @@ class TestKernels(unittest.TestCase):
         print("checking get_in_offsets")
         z = kernels.get_in_offsets(
             self.ha,
-            muons.offsets,
+            leptons.offsets,
             arr,
             inds,
             sel_ev,
             sel_mu)
 
         self.assertTrue(verify_get_in_offsets(
-            asnp(muons.offsets),
+            asnp(leptons.offsets),
             asnp(inds),
             asnp(arr),
             asnp(target), 
             asnp(z)
         ))
  
-        return muons.numevents()
+        return leptons.numevents()
 
     def test_kernel_simple_cut(self):
         print("kernel_simple_cut")
         dataset = self.dataset
-        muons = dataset.structs["Muon"][0]
-        sel_mu = muons.pt > 30.0
-        return muons.numevents()
+        leptons = dataset.structs["lep"][0]
+        sel_mu = leptons.pt > 30.0
+        return leptons.numevents()
     
     def test_kernel_broadcast(self):
         print("kernel_broadcast")
         dataset = self.dataset
-        muons = dataset.structs["Muon"][0]
-        met_pt = dataset.eventvars[0]["MET_pt"]
-        met_pt_permuon = self.NUMPY_LIB.zeros(muons.numobjects(), dtype=self.NUMPY_LIB.float32)
-        kernels.broadcast(self.ha, muons.offsets, met_pt, met_pt_permuon)
+        leptons = dataset.structs["lep"][0]
+        met_pt = dataset.eventvars[0]["met_et"]
+        met_pt_permuon = self.NUMPY_LIB.zeros(leptons.numobjects(), dtype=self.NUMPY_LIB.float32)
+        kernels.broadcast(self.ha, leptons.offsets, met_pt, met_pt_permuon)
         self.assertTrue(verify_broadcast(
-            self.NUMPY_LIB.asnumpy(muons.offsets),
+            self.NUMPY_LIB.asnumpy(leptons.offsets),
             self.NUMPY_LIB.asnumpy(met_pt),
             self.NUMPY_LIB.asnumpy(met_pt_permuon),
         ))
 
-        return muons.numevents()
+        return leptons.numevents()
 
     def test_kernel_mask_deltar_first(self):
         print("kernel_mask_deltar_first")
         dataset = self.dataset
-        muons = dataset.structs["Muon"][0]
-        jet = dataset.structs["Jet"][0]
-        sel_ev = self.NUMPY_LIB.ones(muons.numevents(), dtype=self.NUMPY_LIB.bool)
-        sel_mu = self.NUMPY_LIB.ones(muons.numobjects(), dtype=self.NUMPY_LIB.bool)
+        leptons = dataset.structs["lep"][0]
+        jet = dataset.structs["jet"][0]
+        sel_ev = self.NUMPY_LIB.ones(leptons.numevents(), dtype=self.NUMPY_LIB.bool)
+        sel_mu = self.NUMPY_LIB.ones(leptons.numobjects(), dtype=self.NUMPY_LIB.bool)
         sel_jet = (jet.pt > 10)
-        muons_matched_to_jet = kernels.mask_deltar_first(
+        leptons_matched_to_jet = kernels.mask_deltar_first(
             self.ha,
-            {"offsets": muons.offsets, "eta": muons.eta, "phi": muons.phi},
+            {"offsets": leptons.offsets, "eta": leptons.eta, "phi": leptons.phi},
             sel_mu,
             {"offsets": jet.offsets, "eta": jet.eta, "phi": jet.phi},
             sel_jet, 0.3
         )
-        self.assertEqual(len(muons_matched_to_jet), muons.numobjects())
-        self.assertEqual(muons_matched_to_jet.sum(), 1698542)
-        return muons.numevents()
+        self.assertEqual(len(leptons_matched_to_jet), leptons.numobjects())
+        self.assertEqual(leptons_matched_to_jet.sum(), 12748769)
+        return leptons.numevents()
         
     def test_kernel_select_opposite_sign(self):
         print("kernel_select_opposite_sign")
         dataset = self.dataset
-        muons = dataset.structs["Muon"][0]
-        sel_ev = self.NUMPY_LIB.ones(muons.numevents(), dtype=self.NUMPY_LIB.bool)
-        sel_mu = self.NUMPY_LIB.ones(muons.numobjects(), dtype=self.NUMPY_LIB.bool)
-        muons_passing_os = kernels.select_opposite_sign(
+        leptons = dataset.structs["lep"][0]
+        sel_ev = self.NUMPY_LIB.ones(leptons.numevents(), dtype=self.NUMPY_LIB.bool)
+        sel_mu = self.NUMPY_LIB.ones(leptons.numobjects(), dtype=self.NUMPY_LIB.bool)
+        leptons_passing_os = kernels.select_opposite_sign(
             self.ha,
-            muons.offsets, muons.charge, sel_mu)
-        return muons.numevents()
+            leptons.offsets, leptons.charge, sel_mu)
+        return leptons.numevents()
     
     def test_kernel_histogram_from_vector(self):
         print("kernel_histogram_from_vector")
         dataset = self.dataset
-        muons = dataset.structs["Muon"][0]
-        weights = 2*self.NUMPY_LIB.ones(muons.numobjects(), dtype=self.NUMPY_LIB.float32)
-        ret = kernels.histogram_from_vector(self.ha, muons.pt, weights, self.NUMPY_LIB.linspace(0,200,100, dtype=self.NUMPY_LIB.float32))
-        self.assertEqual(ret[0][20], 112024.0)
-        self.assertEqual(ret[1][20], 2*112024.0)
+        leptons = dataset.structs["lep"][0]
+        weights = 2*self.NUMPY_LIB.ones(leptons.numobjects(), dtype=self.NUMPY_LIB.float32)
+        ret = kernels.histogram_from_vector(self.ha, leptons.pt, weights, self.NUMPY_LIB.linspace(0, 200000, 100, dtype=self.NUMPY_LIB.float32))
+        self.assertEqual(ret[0][20], 1767544.0)
+        self.assertEqual(ret[1][20], 2*1767544.0)
         self.assertEqual(ret[0][0], 0)
-        self.assertEqual(ret[0][-1], 7856.0)
+        self.assertEqual(ret[0][-1], 23980.0)
 
-        self.assertEqual(ret[0].sum(), 3894188.0)
-        self.assertEqual(ret[1].sum(), 2*3894188.0)
-        return muons.numevents()
+        self.assertEqual(ret[0].sum(), 25502050.0)
+        self.assertEqual(ret[1].sum(), 2*25502050.0)
+        return leptons.numevents()
     
     def test_kernel_histogram_from_vector_masked(self):
         print("kernel_histogram_from_vector_masked")
         dataset = self.dataset
-        muons = dataset.structs["Muon"][0]
-        weights = 2*self.NUMPY_LIB.ones(muons.numobjects(), dtype=self.NUMPY_LIB.float32)
-        mask = self.NUMPY_LIB.ones(muons.numobjects(), dtype=self.NUMPY_LIB.bool)
+        leptons = dataset.structs["lep"][0]
+        weights = 2*self.NUMPY_LIB.ones(leptons.numobjects(), dtype=self.NUMPY_LIB.float32)
+        mask = self.NUMPY_LIB.ones(leptons.numobjects(), dtype=self.NUMPY_LIB.bool)
         mask[:100] = False
-        ret = kernels.histogram_from_vector(self.ha, muons.pt, weights, self.NUMPY_LIB.linspace(0,200,100, dtype=self.NUMPY_LIB.float32), mask=mask)
-        self.assertEqual(ret[0][20], 112014.0)
-        self.assertEqual(ret[1][20], 2*112014.0)
+        ret = kernels.histogram_from_vector(self.ha, leptons.pt, weights, self.NUMPY_LIB.linspace(0, 200000, 100, dtype=self.NUMPY_LIB.float32), mask=mask)
+        self.assertEqual(ret[0][20], 1767532.0)
+        self.assertEqual(ret[1][20], 2*1767532.0)
         self.assertEqual(ret[0][0], 0)
-        self.assertEqual(ret[0][-1], 7856.0)
+        self.assertEqual(ret[0][-1], 23980.0)
 
-        self.assertEqual(ret[0].sum(), 3893988.0)
-        self.assertEqual(ret[1].sum(), 2*3893988.0)
-        return muons.numevents()
+        self.assertEqual(ret[0].sum(), 25501850.0)
+        self.assertEqual(ret[1].sum(), 2*25501850.0)
+        return leptons.numevents()
 
     def test_kernel_histogram_from_vector_several(self):
         print("kernel_histogram_from_vector_several")
         dataset = self.dataset
-        muons = dataset.structs["Muon"][0]
-        mask = self.NUMPY_LIB.ones(muons.numobjects(), dtype=self.NUMPY_LIB.bool)
+        leptons = dataset.structs["lep"][0]
+        mask = self.NUMPY_LIB.ones(leptons.numobjects(), dtype=self.NUMPY_LIB.bool)
         mask[:100] = False
-        weights = 2*self.NUMPY_LIB.ones(muons.numobjects(), dtype=self.NUMPY_LIB.float32)
+        weights = 2*self.NUMPY_LIB.ones(leptons.numobjects(), dtype=self.NUMPY_LIB.float32)
         variables = [
-            (muons.pt, self.NUMPY_LIB.linspace(0,200,100, dtype=self.NUMPY_LIB.float32)),
-            (muons.eta, self.NUMPY_LIB.linspace(-4,4,100, dtype=self.NUMPY_LIB.float32)),
-            (muons.phi, self.NUMPY_LIB.linspace(-4,4,100, dtype=self.NUMPY_LIB.float32)),
-            (muons.mass, self.NUMPY_LIB.linspace(0,200,100, dtype=self.NUMPY_LIB.float32)),
-            (muons.charge, self.NUMPY_LIB.array([-1, 0, 1, 2], dtype=self.NUMPY_LIB.float32)),
+            (leptons.pt, self.NUMPY_LIB.linspace(0,200000,100, dtype=self.NUMPY_LIB.float32)),
+            (leptons.eta, self.NUMPY_LIB.linspace(-4,4,100, dtype=self.NUMPY_LIB.float32)),
+            (leptons.phi, self.NUMPY_LIB.linspace(-4,4,100, dtype=self.NUMPY_LIB.float32)),
+            (leptons.z0, self.NUMPY_LIB.linspace(0,200000,100, dtype=self.NUMPY_LIB.float32)),
+            (leptons.charge, self.NUMPY_LIB.array([-1, 0, 1, 2], dtype=self.NUMPY_LIB.float32)),
         ]
         ret = kernels.histogram_from_vector_several(self.ha, variables, weights, mask)
        
@@ -366,7 +363,7 @@ class TestKernels(unittest.TestCase):
                 self.assertEqual(ret[ivar][0][ibin], ret2[0][ibin])
                 self.assertEqual(ret[ivar][1][ibin], ret2[1][ibin])
 
-        return muons.numevents()
+        return leptons.numevents()
 
     def test_coordinate_transformation(self):
         print("coordinate_transformation")

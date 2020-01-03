@@ -31,7 +31,7 @@ def time_kernel(dataset, test_kernel):
     return speed
 
 def test_kernel_sum_in_offsets(dataset):
-    muons = dataset.structs["Muon"][0]
+    muons = dataset.structs["lep"][0]
     sel_ev = nplib.ones(muons.numevents(), dtype=nplib.bool)
     sel_mu = nplib.ones(muons.numobjects(), dtype=nplib.bool)
     z = kernels.sum_in_offsets(
@@ -42,11 +42,11 @@ def test_kernel_sum_in_offsets(dataset):
         sel_mu, dtype=nplib.float32)
 
 def test_kernel_simple_cut(dataset):
-    muons = dataset.structs["Muon"][0]
+    muons = dataset.structs["lep"][0]
     sel_mu = muons.pt > 30.0
 
 def test_kernel_max_in_offsets(dataset):
-    muons = dataset.structs["Muon"][0]
+    muons = dataset.structs["lep"][0]
     sel_ev = nplib.ones(muons.numevents(), dtype=nplib.bool)
     sel_mu = nplib.ones(muons.numobjects(), dtype=nplib.bool)
     z = kernels.max_in_offsets(
@@ -57,7 +57,7 @@ def test_kernel_max_in_offsets(dataset):
         sel_mu)
     
 def test_kernel_get_in_offsets(dataset):
-   muons = dataset.structs["Muon"][0]
+   muons = dataset.structs["lep"][0]
    sel_ev = nplib.ones(muons.numevents(), dtype=nplib.bool)
    sel_mu = nplib.ones(muons.numobjects(), dtype=nplib.bool)
    inds = nplib.zeros(muons.numevents(), dtype=nplib.int8)
@@ -71,8 +71,8 @@ def test_kernel_get_in_offsets(dataset):
        sel_mu)
 
 def test_kernel_mask_deltar_first(dataset):
-    muons = dataset.structs["Muon"][0]
-    jet = dataset.structs["Jet"][0]
+    muons = dataset.structs["lep"][0]
+    jet = dataset.structs["jet"][0]
     sel_ev = nplib.ones(muons.numevents(), dtype=nplib.bool)
     sel_mu = nplib.ones(muons.numobjects(), dtype=nplib.bool)
     sel_jet = (jet.pt > 10)
@@ -85,12 +85,12 @@ def test_kernel_mask_deltar_first(dataset):
     )
 
 def test_kernel_histogram_from_vector(dataset):
-    muons = dataset.structs["Muon"][0]
+    muons = dataset.structs["lep"][0]
     weights = 2*nplib.ones(muons.numobjects(), dtype=nplib.float32)
     ret = kernels.histogram_from_vector(backend, muons.pt, weights, nplib.linspace(0,200,100, dtype=nplib.float32))
 
 def test_kernel_histogram_from_vector_several(dataset):
-    muons = dataset.structs["Muon"][0]
+    muons = dataset.structs["lep"][0]
     mask = nplib.ones(muons.numobjects(), dtype=nplib.bool)
     mask[:100] = False
     weights = 2*nplib.ones(muons.numobjects(), dtype=nplib.float32)
@@ -98,13 +98,13 @@ def test_kernel_histogram_from_vector_several(dataset):
         (muons.pt, nplib.linspace(0,200,100, dtype=nplib.float32)),
         (muons.eta, nplib.linspace(-4,4,100, dtype=nplib.float32)),
         (muons.phi, nplib.linspace(-4,4,100, dtype=nplib.float32)),
-        (muons.mass, nplib.linspace(0,200,100, dtype=nplib.float32)),
+        (muons.z0, nplib.linspace(0,200,100, dtype=nplib.float32)),
         (muons.charge, nplib.array([-1, 0, 1, 2], dtype=nplib.float32)),
     ]
     ret = kernels.histogram_from_vector_several(backend, variables, weights, mask)
     
 def test_kernel_select_opposite_sign(dataset):
-    muons = dataset.structs["Muon"][0]
+    muons = dataset.structs["lep"][0]
     sel_ev = nplib.ones(muons.numevents(), dtype=nplib.bool)
     sel_mu = nplib.ones(muons.numobjects(), dtype=nplib.bool)
     muons_passing_os = kernels.select_opposite_sign(
@@ -169,5 +169,5 @@ def run_timing(ds):
     return ret
 
 if __name__ == "__main__":
-    dataset = load_dataset(nplib, 5)
+    dataset = load_dataset(nplib, 2)
     test_timing(dataset)
