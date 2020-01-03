@@ -5,11 +5,11 @@ def spherical_to_cartesian(backend, pt, eta, phi, mass):
     """Converts an array of spherical four-momentum coordinates (pt, eta, phi, mass) to cartesian (px, py ,pz, E).
     
     Args:
-        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
-        pt (array of floats): Data array of the transverse momentum values (numpy or cupy)
-        eta (array of floats): Data array of the pseudorapidity
-        phi (array of floats): Data array of the azimuthal angle
-        mass (array of floats): Data array of the mass
+        backend (module): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda.
+        pt (array of floats): Data array of the transverse momentum values (numpy or cupy).
+        eta (array of floats): Data array of the pseudorapidity.
+        phi (array of floats): Data array of the azimuthal angle.
+        mass (array of floats): Data array of the mass.
     
     Returns:
         tuple of arrays: returns the numpy or cupy arrays (px, py, pz, E) 
@@ -20,11 +20,11 @@ def cartesian_to_spherical(backend, px, py, pz, e):
     """Converts an array of cartesian four-momentum coordinates (px, py ,pz, E) to spherical (pt, eta, phi, mass).
     
     Args:
-        backend (library): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda
-        px (array of floats): Data array of the momentum x coordinate (numpy or cupy)
-        py (array of floats): Data array of the momentum y coordinate
-        pz (array of floats): Data array of the momentum z coordinate
-        e (array of floats): Data array of the energy values
+        backend (module): either hepaccelerate.backend_cpu or hepaccelerate.backend_cuda.
+        px (array of floats): Data array of the momentum x coordinate (numpy or cupy).
+        py (array of floats): Data array of the momentum y coordinate.
+        pz (array of floats): Data array of the momentum z coordinate.
+        e (array of floats): Data array of the energy values.
     
     Returns:
         tuple of arrays: returns the numpy or cupy arrays (pt, eta, phi, mass)
